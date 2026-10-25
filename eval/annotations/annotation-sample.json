@@ -1,0 +1,330 @@
+{
+  "dataset_version": "2026-10-25.2",
+  "sample_size": 36,
+  "items": [
+    {
+      "case_id": "E01",
+      "split": "dev",
+      "category": "extraction",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "E07",
+      "split": "dev",
+      "category": "extraction",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "E09",
+      "split": "dev",
+      "category": "decisions",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "E10",
+      "split": "dev",
+      "category": "decisions",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "E14",
+      "split": "dev",
+      "category": "entities",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "E18",
+      "split": "dev",
+      "category": "entities",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "E16",
+      "split": "dev",
+      "category": "trust",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "PZ01",
+      "split": "dev",
+      "category": "trust",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "E02",
+      "split": "dev",
+      "category": "crm",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "E03",
+      "split": "dev",
+      "category": "crm",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "D-SUM-01",
+      "split": "dev",
+      "category": "summary",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "D-SUM-02",
+      "split": "dev",
+      "category": "summary",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "D-WOR-01",
+      "split": "dev",
+      "category": "workflow",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "D-WOR-02",
+      "split": "dev",
+      "category": "workflow",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "D-WOR-03",
+      "split": "dev",
+      "category": "workflow",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "M01",
+      "split": "dev",
+      "category": "memory",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "D-MEM-01",
+      "split": "dev",
+      "category": "memory",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "D-MEM-02",
+      "split": "dev",
+      "category": "memory",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-EXT-01",
+      "split": "test",
+      "category": "extraction",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-EXT-02",
+      "split": "test",
+      "category": "extraction",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-DEC-01",
+      "split": "test",
+      "category": "decisions",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-DEC-02",
+      "split": "test",
+      "category": "decisions",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-ENT-01",
+      "split": "test",
+      "category": "entities",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-ENT-02",
+      "split": "test",
+      "category": "entities",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-TRU-01",
+      "split": "test",
+      "category": "trust",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-TRU-02",
+      "split": "test",
+      "category": "trust",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-CRM-01",
+      "split": "test",
+      "category": "crm",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-CRM-02",
+      "split": "test",
+      "category": "crm",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-SUM-01",
+      "split": "test",
+      "category": "summary",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-SUM-02",
+      "split": "test",
+      "category": "summary",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-WOR-01",
+      "split": "test",
+      "category": "workflow",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-WOR-02",
+      "split": "test",
+      "category": "workflow",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-WOR-03",
+      "split": "test",
+      "category": "workflow",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-MEM-01",
+      "split": "test",
+      "category": "memory",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-MEM-02",
+      "split": "test",
+      "category": "memory",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    },
+    {
+      "case_id": "T-MEM-03",
+      "split": "test",
+      "category": "memory",
+      "annotator_a": null,
+      "annotator_b": null,
+      "adjudicator": null,
+      "status": "pending"
+    }
+  ]
+}

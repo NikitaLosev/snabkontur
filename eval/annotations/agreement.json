@@ -1,0 +1,1429 @@
+{
+  "dataset_version": "2026-10-25.2",
+  "files": {
+    "a": {
+      "path": "D:\\projects\\snabkontur\\eval\\annotations\\human1.json",
+      "sha256": "88610e53f9653afb54bb82297b6b53b1e14e72bdcc2d088caa14336a86dac1da"
+    },
+    "b": {
+      "path": "D:\\projects\\snabkontur\\eval\\annotations\\human2.json",
+      "sha256": "7d6ff726cd321c30f59992c5da14dfcecc3185e0c9ea386f3bf1c8321603fe76"
+    }
+  },
+  "cases": 36,
+  "source_hashes_recorded": {
+    "a": true,
+    "b": false
+  },
+  "metrics": {
+    "facts": {
+      "a": 194,
+      "b": 194,
+      "matched": 193,
+      "f1": 0.9948453608247423
+    },
+    "issues": {
+      "a": 13,
+      "b": 13,
+      "matched": 10,
+      "f1": 0.7692307692307693
+    },
+    "answers": {
+      "a": 251,
+      "b": 251,
+      "matched": 251,
+      "f1": 1.0
+    }
+  },
+  "macro_nonempty_facts_f1": 0.9991423670668954,
+  "both_empty_fact_cases": 14,
+  "shared_state_checkpoints": 391,
+  "equal_state_checkpoints": 328,
+  "equal_final_states": 35,
+  "limitations": [
+    "LLM2 участвовал в подготовке датасета; это не полностью независимая слепая оценка.",
+    "Имя файла human1 не подтверждает личность аннотатора. Его annotation_policy описывает модельную разметку.",
+    "Состояния выведены из операций и не являются независимыми оценками.",
+    "Смысл названий задач сопоставлен фиксированными правилами; остальные свободные формулировки требуют арбитража.",
+    "Пустые множества дают F1=null и не добавляют 100% к macro F1."
+  ],
+  "normalization": "Фиксированная до чтения human1: локальные task ID заменяются на purchase+intent+document, нормализуются регистр, ё/е, пробелы и десятичные числа; evidence, reason, explanation не входят в сравнение содержания. Названия задач сохраняются в исходных файлах.",
+  "per_case": [
+    {
+      "case_id": "E01",
+      "facts": {
+        "a": 9,
+        "b": 9,
+        "matched": 9,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "E07",
+      "facts": {
+        "a": 3,
+        "b": 3,
+        "matched": 3,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "E09",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 1,
+        "equal": 1,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "E10",
+      "facts": {
+        "a": 2,
+        "b": 2,
+        "matched": 2,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "E14",
+      "facts": {
+        "a": 5,
+        "b": 5,
+        "matched": 5,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 3,
+        "equal": 3,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "E18",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 0,
+        "f1": 0.0,
+        "only_a": [
+          [
+            "ingest",
+            "ambiguous_purchase",
+            null
+          ]
+        ],
+        "only_b": [
+          [
+            "ingest",
+            "ambiguous_purchase",
+            "p-17"
+          ]
+        ]
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 1,
+        "equal": 1,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "E16",
+      "facts": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 0,
+        "f1": 0.0,
+        "only_a": [
+          [
+            "ingest",
+            "untrusted_instruction",
+            null
+          ]
+        ],
+        "only_b": [
+          [
+            "ingest",
+            "untrusted_instruction",
+            "p-17"
+          ]
+        ]
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "PZ01",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 6,
+        "b": 6,
+        "matched": 6,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 3,
+        "equal": 3,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "E02",
+      "facts": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "E03",
+      "facts": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "D-SUM-01",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 6,
+        "b": 6,
+        "matched": 6,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "D-SUM-02",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 6,
+        "b": 6,
+        "matched": 6,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "D-WOR-01",
+      "facts": {
+        "a": 3,
+        "b": 3,
+        "matched": 3,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 5,
+        "b": 5,
+        "matched": 5,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 7,
+        "equal": 7,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "D-WOR-02",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 5,
+        "b": 5,
+        "matched": 5,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 6,
+        "equal": 6,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "D-WOR-03",
+      "facts": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 5,
+        "b": 5,
+        "matched": 5,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 8,
+        "equal": 8,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "M01",
+      "facts": {
+        "a": 53,
+        "b": 53,
+        "matched": 52,
+        "f1": 0.9811320754716981,
+        "only_a": [
+          [
+            "mep02",
+            "p-m01",
+            "supplier",
+            "ооо «северфильтр»"
+          ]
+        ],
+        "only_b": [
+          [
+            "mep02",
+            "p-m01",
+            "supplier",
+            "северфильтр"
+          ]
+        ]
+      },
+      "issues": {
+        "a": 3,
+        "b": 3,
+        "matched": 3,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 32,
+        "b": 32,
+        "matched": 32,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 63,
+        "equal": 3,
+        "different": [
+          "MA02",
+          "MA03",
+          "MA04",
+          "MA05",
+          "MA06",
+          "MA09",
+          "MA10",
+          "MA11",
+          "MA12",
+          "MA14",
+          "MA16",
+          "MA18",
+          "MA19",
+          "MA21",
+          "MA21-UNDO",
+          "MA23",
+          "MA24",
+          "MA25",
+          "MA26",
+          "MA28",
+          "MA29",
+          "MEP03",
+          "MEP04",
+          "MEP05",
+          "MEP06",
+          "MEP07",
+          "MEP08",
+          "MEP09",
+          "MEP10",
+          "MEP11",
+          "MEP12",
+          "MEP13",
+          "MEP14",
+          "MEP15",
+          "MEP16",
+          "MEP17",
+          "MEP18",
+          "MEP19",
+          "MEP20",
+          "MEP21",
+          "MEP22",
+          "MEP23",
+          "MEP24",
+          "MEP25",
+          "MEP26",
+          "MEP27",
+          "MEP28",
+          "MEP29",
+          "MEP30",
+          "MQ01",
+          "MQ02",
+          "MQ03",
+          "MQ04",
+          "MQ05",
+          "MQ06",
+          "MQ07",
+          "MQ08",
+          "MQ09",
+          "MQ10",
+          "MQ11"
+        ],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": false
+    },
+    {
+      "case_id": "D-MEM-01",
+      "facts": {
+        "a": 18,
+        "b": 18,
+        "matched": 18,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 31,
+        "b": 31,
+        "matched": 31,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 46,
+        "equal": 46,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "D-MEM-02",
+      "facts": {
+        "a": 18,
+        "b": 18,
+        "matched": 18,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 31,
+        "b": 31,
+        "matched": 31,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 51,
+        "equal": 49,
+        "different": [
+          "D-MEM-02-step19",
+          "D-MEM-02-step25"
+        ],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-EXT-01",
+      "facts": {
+        "a": 4,
+        "b": 4,
+        "matched": 4,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-EXT-02",
+      "facts": {
+        "a": 4,
+        "b": 4,
+        "matched": 4,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-DEC-01",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 1,
+        "equal": 1,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-DEC-02",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 1,
+        "equal": 1,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-ENT-01",
+      "facts": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-ENT-02",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 0,
+        "f1": 0.0,
+        "only_a": [
+          [
+            "t-ent-02-step1",
+            "ambiguous_purchase",
+            null
+          ]
+        ],
+        "only_b": [
+          [
+            "t-ent-02-step1",
+            "ambiguous_purchase",
+            "p-t302"
+          ]
+        ]
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 1,
+        "equal": 1,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-TRU-01",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 2,
+        "b": 2,
+        "matched": 2,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-TRU-02",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 2,
+        "b": 2,
+        "matched": 2,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-CRM-01",
+      "facts": {
+        "a": 2,
+        "b": 2,
+        "matched": 2,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 5,
+        "equal": 5,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-CRM-02",
+      "facts": {
+        "a": 5,
+        "b": 5,
+        "matched": 5,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 3,
+        "equal": 3,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-SUM-01",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 6,
+        "b": 6,
+        "matched": 6,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-SUM-02",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 6,
+        "b": 6,
+        "matched": 6,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 2,
+        "equal": 2,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-WOR-01",
+      "facts": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 5,
+        "b": 5,
+        "matched": 5,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 6,
+        "equal": 6,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-WOR-02",
+      "facts": {
+        "a": 3,
+        "b": 3,
+        "matched": 3,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 5,
+        "b": 5,
+        "matched": 5,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 7,
+        "equal": 7,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-WOR-03",
+      "facts": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 5,
+        "b": 5,
+        "matched": 5,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 8,
+        "equal": 8,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-MEM-01",
+      "facts": {
+        "a": 18,
+        "b": 18,
+        "matched": 18,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 1,
+        "b": 1,
+        "matched": 1,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 31,
+        "b": 31,
+        "matched": 31,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 45,
+        "equal": 45,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-MEM-02",
+      "facts": {
+        "a": 20,
+        "b": 20,
+        "matched": 20,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 31,
+        "b": 31,
+        "matched": 31,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 49,
+        "equal": 48,
+        "different": [
+          "T-MEM-02-a13"
+        ],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    },
+    {
+      "case_id": "T-MEM-03",
+      "facts": {
+        "a": 21,
+        "b": 21,
+        "matched": 21,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "issues": {
+        "a": 0,
+        "b": 0,
+        "matched": 0,
+        "f1": null,
+        "only_a": [],
+        "only_b": []
+      },
+      "answers": {
+        "a": 31,
+        "b": 31,
+        "matched": 31,
+        "f1": 1.0,
+        "only_a": [],
+        "only_b": []
+      },
+      "states": {
+        "shared": 46,
+        "equal": 46,
+        "different": [],
+        "only_a": [],
+        "only_b": []
+      },
+      "final_state_equal": true
+    }
+  ]
+}
