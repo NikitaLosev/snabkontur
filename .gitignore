@@ -218,3 +218,54 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local secrets (keep shareable environment templates)
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.aws/
+*.key
+*.pem
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.tmp/
+tmp/
+.eval-tools/
+
+# Local CRM databases and SQLite sidecars
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Local sources, models and telemetry
+/data/raw/
+/data/local/
+/recordings/
+/models/
+/traces/
+.ollama/
+.huggingface/
+
+# Generated evaluation outputs; datasets and annotations stay versioned
+eval-report*.json
+eval/.score-selfcheck.json
