@@ -2,12 +2,12 @@
   "dataset_version": "2026-10-25.2",
   "files": {
     "a": {
-      "path": "D:\\projects\\snabkontur\\eval\\annotations\\human1.json",
-      "sha256": "88610e53f9653afb54bb82297b6b53b1e14e72bdcc2d088caa14336a86dac1da"
+      "path": "eval/annotations/human1.json",
+      "sha256": "c660d07f34a544826dcd8f557974d896642adffe32ffb1dd04993f224264456c"
     },
     "b": {
-      "path": "D:\\projects\\snabkontur\\eval\\annotations\\human2.json",
-      "sha256": "7d6ff726cd321c30f59992c5da14dfcecc3185e0c9ea386f3bf1c8321603fe76"
+      "path": "eval/annotations/human2.json",
+      "sha256": "e41543012d6cf17a9312109089882d83fd4fbb4d4c880be879b38c2bbed90008"
     }
   },
   "cases": 36,
