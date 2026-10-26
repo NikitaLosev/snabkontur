@@ -109,7 +109,7 @@ def run(a_path,b_path):
     sources={}
     for split in ('dev','test'):
         path=ROOT.parent/f'{split}.jsonl'
-        if split in recorded_hashes:assert hashlib.sha256(path.read_bytes()).hexdigest()==recorded_hashes[split], ('Dataset changed since annotation',split)
+        if split in recorded_hashes:assert hashlib.sha256(path.read_bytes().replace(b'\r\n',b'\n')).hexdigest()==recorded_hashes[split], ('Dataset changed since annotation',split)
         for line in path.read_text(encoding='utf-8').splitlines():
             c=json.loads(line)
             if c['id'] in by_a:sources[c['id']]={'case_id':c['id'],'split':split,'input':c['input']}
@@ -133,7 +133,8 @@ def run(a_path,b_path):
         final_b=by_b[cid].get('final_state',next(reversed(checks_b.values())) if checks_b else None)
         row['final_state_equal']=ca.state(final_a)==cb.state(final_b) if final_a is not None and final_b is not None else None
         rows.append(row)
-    report={'dataset_version':a['dataset_version'],'files':{'a':{'path':str(a_path),'sha256':hashlib.sha256(Path(a_path).read_bytes()).hexdigest()},'b':{'path':str(b_path),'sha256':hashlib.sha256(Path(b_path).read_bytes()).hexdigest()}},
+    rel=lambda p:Path(p).resolve().relative_to(ROOT.parent.parent).as_posix() if Path(p).resolve().is_relative_to(ROOT.parent.parent) else str(p)
+    report={'dataset_version':a['dataset_version'],'files':{'a':{'path':rel(a_path),'sha256':hashlib.sha256(Path(a_path).read_bytes()).hexdigest()},'b':{'path':rel(b_path),'sha256':hashlib.sha256(Path(b_path).read_bytes()).hexdigest()}},
       'cases':len(rows),'source_hashes_recorded':{'a':bool(a.get('source_sha256')),'b':bool(b.get('source_sha256'))},'metrics':{label:metric(*pair) for label,pair in totals.items()},
       'macro_nonempty_facts_f1':sum(r['facts']['f1'] for r in rows if r['facts']['f1'] is not None)/sum(r['facts']['f1'] is not None for r in rows),
       'both_empty_fact_cases':sum(r['facts']['a']+r['facts']['b']==0 for r in rows),'shared_state_checkpoints':state_total,'equal_state_checkpoints':state_equal,'equal_final_states':sum(r['final_state_equal'] for r in rows),
