@@ -4,15 +4,21 @@ import json
 
 import pytest
 
-from snab.contracts import EpisodeContext, StopReason
+from snab.contracts import EpisodeContext, StopReason, SystemOutput
 from snab.crm import MockCrm
 from snab.systems import build_system
-from snab.systems.llm import PROMPT_TOKEN_BUDGET, LlmSystem, estimate_tokens, trim_request
+from snab.systems.llm import PROMPT_TOKEN_BUDGET, Extraction, LlmSystem, estimate_tokens, trim_request
 from snab.tools import DEFAULT_BUDGET, FaultInjector, ModelTools, StepBudget
 from snab.trace import Tracer
 
 TEXT = "По P-1 бюджет 4 млн рублей."
-FIELDS = {"supplier": "Атлас", "title": "Ремни", "budget": "5000000.00", "delivery_date": "2026-11-15"}
+FIELDS = {
+    "supplier": "Атлас",
+    "title": "Ремни",
+    "budget": "5000000.00",
+    "currency": "RUB",
+    "delivery_date": "2026-11-15",
+}
 STATE = {"purchases": {"P-1": {"revision": 3, "fields": FIELDS}}, "tasks": {}}
 EVENT = {"id": "e1", "text": TEXT}
 OFFER_CHUNK = {"id": "m2", "source_id": "meet", "text": "По P-1 при полной предоплате могу по 12000 рублей отдать."}
@@ -22,7 +28,7 @@ UNLINKED = {"id": "e3", "text": "По ремням у Атласа дату со
 def change(field: str, value: object, event: dict, quote: str, status: str = "agreed") -> dict:
     """Операция set_field в формате ответа модели."""
     return {
-        "op": "set_field",
+        "action": "set_field",
         "purchase_id": "P-1",
         "field": field,
         "value": value,
@@ -36,7 +42,7 @@ VALID = {
     "changes": [
         BUDGET_CHANGE,
         {
-            "op": "create_task",
+            "action": "create_task",
             "purchase_id": "P-1",
             "title": "Запросить счёт",
             "owner": "Анна",
@@ -90,10 +96,12 @@ def make_tools(state: dict = STATE, faults: list | None = None, budget: StepBudg
     return ModelTools(crm, injector, Tracer("run", "case", 1), budget)
 
 
-def make_context(events: list[dict], seen: list[dict] | None = None, episode: str = "step1", **extra) -> EpisodeContext:
+def make_context(
+    events: list[dict], seen: list[dict] | None = None, episode: str = "step1", state: dict = STATE, **extra
+) -> EpisodeContext:
     """Контекст куска: новые события и все поступившие к нему."""
     return EpisodeContext(
-        episode_id=episode, events=events, seen_events=[*(seen or []), *events], crm_state=STATE, **extra
+        episode_id=episode, events=events, seen_events=[*(seen or []), *events], crm_state=state, **extra
     )
 
 
@@ -120,7 +128,13 @@ def test_reply_becomes_one_proposal_per_purchase() -> None:
             "available_after": "step1",
             "based_on": {"P-1": 3},
             "operations": [
-                {key: value for key, value in BUDGET_CHANGE.items() if key != "status"},
+                {
+                    "op": "set_field",
+                    "purchase_id": "P-1",
+                    "field": "budget",
+                    "value": "4000000.00",
+                    "evidence": BUDGET_CHANGE["evidence"],
+                },
                 {
                     "op": "create_task",
                     "task": {
@@ -148,6 +162,8 @@ def test_reply_becomes_one_proposal_per_purchase() -> None:
         ({"code": "ambiguous_purchase", "event_id": "e3"}, True),
         ({"code": "unresolved_terms", "event_id": "e1", "purchase_id": "P-1"}, False),
         ({"code": "unknown_speaker_authority", "event_id": "e3"}, False),
+        # Вопрос о привязке без сообщения: закупщику не на что ответить
+        ({"code": "ambiguous_purchase", "purchase_id": "P-1"}, False),
     ],
 )
 def test_model_issue_checked_by_code(issue: dict, kept: bool) -> None:
@@ -381,7 +397,9 @@ def test_meeting_chunks_become_one_package_after_source_ends() -> None:
         "text": "По P-1 финансы подтвердили, по 12000 рублей берём.",
     }
     state = {
-        "purchases": {"P-1": {"revision": 1, "fields": {"unit_price": "13000.00", "prepayment_percent": 0}}},
+        "purchases": {
+            "P-1": {"revision": 1, "fields": {"unit_price": "13000.00", "currency": "RUB", "prepayment_percent": 0}}
+        },
         "tasks": {},
     }
     first = {
@@ -491,13 +509,232 @@ def test_context_trim_keeps_everything_that_fits() -> None:
     assert (stats["quotes_dropped"], stats["cards_omitted"], stats["over_budget"]) == (0, [], False)
 
 
-def test_answer_query_returns_model_answer() -> None:
-    system, _ = single([json.dumps({"answer": {"budget": "5000000.00"}})])
-    query = {"id": "a1", "text": "Какой лимит по P-1?"}
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Кто поставщик по P-1?",
+        # В карточке есть срок, но не письмо и не основание: подмножество полей ответом не считается
+        "Срок из последнего доставленного письма по P-1 сейчас основной?",
+        "Когда ожидаем поставку по P-1 и на чём основан срок?",
+        "Какой лимит сейчас по P-1 и откуда он взялся?",
+    ],
+)
+def test_answer_query_returns_model_answer(text: str) -> None:
+    system, _ = single([json.dumps({"answer": {"supplier": "Атлас"}})])
+    query = {"id": "a1", "text": text}
 
     output = system.answer_query(make_context([]), query, make_tools())
 
-    assert output.answers == [{"query_id": "a1", "answer": {"budget": "5000000.00"}, "evidence": []}]
+    assert output.answers == [{"query_id": "a1", "answer": {"supplier": "Атлас"}, "evidence": []}]
+
+
+def task(task_id: str, due_date: str | None, status: str = "open") -> dict:
+    """Задача P-1."""
+    return {
+        "id": task_id,
+        "purchase_id": "P-1",
+        "title": "Сверить",
+        "owner": "Анна",
+        "due_date": due_date,
+        "status": status,
+    }
+
+
+TASK_STATE = {
+    "purchases": STATE["purchases"],
+    "tasks": {
+        "T1": task("T1", "2026-11-10"),
+        "T2": task("T2", "2026-11-16"),
+        "T3": task("T3", None),
+        "T4": task("T4", "2026-11-12", "done"),
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("text", "answer"),
+    [
+        (
+            "Что у меня на сегодня и ближайшие два дня? Просрочку тоже покажи.",
+            # Окно 14-16 ноября: T1 просрочена, T2 в окне, у T3 нет срока, T4 выполнена; поставка P-1 15 ноября
+            {
+                "window_start": "2026-11-14",
+                "window_end": "2026-11-16",
+                "overdue_task_ids": ["T1"],
+                "upcoming_task_ids": ["T2"],
+                "unscheduled_task_ids": ["T3"],
+                "deliveries": [{"purchase_id": "P-1", "delivery_date": "2026-11-15"}],
+            },
+        ),
+        ("Какой лимит по P-1?", {"budget": "5000000.00", "currency": "RUB"}),
+        (
+            "Кто ещё что должен сделать по P-1?",
+            {"tasks": [task("T1", "2026-11-10"), task("T2", "2026-11-16"), task("T3", None)]},
+        ),
+        # "срок" здесь о поручении, а не о дате поставки
+        (
+            "Кто и к какому сроку должен принять остаток по P-1?",
+            {"tasks": [task("T1", "2026-11-10"), task("T2", "2026-11-16"), task("T3", None)]},
+        ),
+    ],
+)
+def test_summary_fields_and_tasks_answered_by_code_without_model(text: str, answer: dict) -> None:
+    system, client = single([])
+    context = make_context([], state=TASK_STATE, now="2026-11-14T08:00:00+03:00")
+
+    output = system.answer_query(context, {"id": "a1", "text": text}, make_tools(TASK_STATE))
+
+    assert client.payloads == []
+    assert output.answers == [{"query_id": "a1", "answer": answer, "evidence": []}]
+
+
+def test_extraction_schema_names_operation_first() -> None:
+    # Ollama строит грамматику с ключами по алфавиту: первый ключ варианта выбирает операцию
+    schema = Extraction.model_json_schema()
+    variants = [
+        schema["$defs"][ref["$ref"].split("/")[-1]] for ref in schema["properties"]["changes"]["items"]["anyOf"]
+    ]
+
+    first_keys = {min(variant["properties"]) for variant in variants}
+    actions = {variant["properties"]["action"]["const"] for variant in variants}
+
+    assert (first_keys, actions) == ({"action"}, {"set_field", "create_task", "update_task"})
+
+
+def operations_of(output: SystemOutput) -> list[tuple]:
+    """(поле, значение, цитаты) операций всех предложений."""
+    return [
+        (op["field"], op["value"], [quote["quote"] for quote in op["evidence"]])
+        for proposal in output.proposals
+        for op in proposal["operations"]
+    ]
+
+
+def test_partial_receipt_sets_status_by_code() -> None:
+    state = {
+        "purchases": {"P-1": {"revision": 2, "fields": {"quantity": 10, "delivered_quantity": 0, "status": "ordered"}}},
+        "tasks": {},
+    }
+    receipt = {"id": "e7", "text": "По P-1 приняли 4 штуки, это первая часть заказа."}
+    reply = {"changes": [change("delivered_quantity", 4, receipt, "приняли 4 штуки")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([receipt], state=state), make_tools(state))
+
+    assert operations_of(output) == [
+        ("delivered_quantity", 4, ["приняли 4 штуки"]),
+        ("status", "partially_delivered", ["приняли 4 штуки"]),
+    ]
+
+
+BARE = {"purchases": {"P-1": {"revision": 1, "fields": {"supplier": "Атлас"}}}, "tasks": {}}
+
+
+def test_currency_and_unit_follow_words_in_quotes() -> None:
+    order = {"id": "e8", "text": "По P-1 берём 8 штук по 125 рублей."}
+    reply = {
+        "changes": [change("quantity", 8, order, "8 штук"), change("unit_price", "125.00", order, "по 125 рублей")],
+        "issues": [],
+    }
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([order], state=BARE), make_tools(BARE))
+
+    assert operations_of(output) == [
+        ("quantity", 8, ["8 штук"]),
+        ("unit_price", "125.00", ["по 125 рублей"]),
+        ("currency", "RUB", ["по 125 рублей"]),
+        ("unit", "шт", ["8 штук"]),
+    ]
+    assert output.issues == []
+
+
+def test_currency_from_message_when_quote_has_none() -> None:
+    order = {"id": "e8", "text": "По P-1 по 125, рублей хватает."}
+    reply = {"changes": [change("unit_price", "125.00", order, "по 125")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([order], state=BARE), make_tools(BARE))
+
+    assert operations_of(output) == [("unit_price", "125.00", ["по 125"]), ("currency", "RUB", [order["text"]])]
+
+
+def test_price_without_currency_asks_purchaser() -> None:
+    price = {"id": "e9", "text": "По P-1 цена 125 за штуку."}
+    reply = {"changes": [change("unit_price", "125.00", price, "цена 125 за штуку")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([price], state=BARE), make_tools(BARE))
+
+    assert operations_of(output) == [("unit_price", "125.00", ["цена 125 за штуку"])]
+    assert output.issues == [{"code": "missing_currency", "event_id": "e9", "purchase_id": "P-1", "after": "step1"}]
+
+
+def test_money_equal_to_card_asks_no_currency() -> None:
+    state = {"purchases": {"P-1": {"revision": 1, "fields": {"budget": "5000000.00", "currency": None}}}, "tasks": {}}
+    same = {"id": "e9", "text": "По P-1 бюджет 5000000 без изменений."}
+    reply = {"changes": [change("budget", "5000000.00", same, "бюджет 5000000")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([same], state=state), make_tools(state))
+
+    assert (output.proposals, output.issues) == ([], [])
+
+
+def test_changed_quantity_gets_no_unit() -> None:
+    # Единица ставится только с первым количеством карточки, как в разметке D-WOR-09
+    state = {"purchases": {"P-1": {"revision": 1, "fields": {"quantity": 10}}}, "tasks": {}}
+    order = {"id": "e8", "text": "По P-1 нужно 8 штук."}
+    reply = {"changes": [change("quantity", 8, order, "8 штук")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([order], state=state), make_tools(state))
+
+    assert operations_of(output) == [("quantity", 8, ["8 штук"])]
+
+
+@pytest.mark.parametrize(
+    ("occurred_at", "proposed", "issues"),
+    [
+        (None, [], [{"code": "missing_source_time", "event_id": "e5", "purchase_id": "P-1", "after": "step1"}]),
+        ("2026-11-19T10:00:00+03:00", [("delivery_date", "2026-11-20", ["поставим завтра"])], []),
+    ],
+)
+def test_relative_date_needs_message_time(occurred_at: str | None, proposed: list, issues: list) -> None:
+    soon = {"id": "e5", "occurred_at": occurred_at, "text": "По P-1 поставим завтра."}
+    reply = {"changes": [change("delivery_date", "2026-11-20", soon, "поставим завтра")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([soon]), make_tools())
+
+    assert (operations_of(output), output.issues) == (proposed, issues)
+
+
+def test_money_that_is_not_a_number_is_not_proposed() -> None:
+    blurred = {"id": "e6", "text": "По P-1 цена неразборчиво, рублей."}
+    reply = {"changes": [change("unit_price", "неразборчиво", blurred, "цена неразборчиво")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([blurred]), make_tools())
+
+    assert (output.proposals, output.issues) == ([], [])
+
+
+@pytest.mark.parametrize("amount", ["800000", "восемьсот тысяч"])
+def test_unrelated_authorized_quote_does_not_pass_unknown_speaker_value(amount: str) -> None:
+    marina = {"id": "e1", "author": "Марина", "text": "По P-1 подтвердил лимит 1000000 рублей."}
+    voice = {"id": "e2", "speaker_id": "SPEAKER_01", "text": f"По P-1 лимит теперь {amount} рублей."}
+    pooled = change("budget", "800000.00", voice, f"лимит теперь {amount}")
+    pooled["evidence"].insert(0, {"event_id": "e1", "quote": "подтвердил лимит 1000000"})
+    system, _ = single([json.dumps({"changes": [pooled], "issues": []})])
+    registry = {"Марина": {"can_confirm": ["budget"]}}
+
+    output = system.process_episode(make_context([marina, voice], authority_registry=registry), make_tools())
+
+    assert output.proposals == []
+    assert output.issues == [
+        {"code": "unknown_speaker_authority", "event_id": "e2", "purchase_id": "P-1", "after": "step1"}
+    ]
 
 
 @pytest.mark.parametrize("name", ["llm_single", "agent"])
@@ -507,6 +744,6 @@ def test_describe_records_model_prompts_and_schemas(name: str) -> None:
 
     meta = system.describe()
 
-    assert meta["system"] == name and meta["model_digest"] == "sha256:fake"
+    assert (meta["system"], meta["system_version"], meta["model_digest"]) == (name, "s1.1", "sha256:fake")
     expected = {"extract", "answer", "retry"} | ({"tools", "final"} if name == "agent" else set())
     assert set(meta["prompt_hashes"]) == set(meta["prompts"]) == expected

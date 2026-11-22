@@ -40,6 +40,8 @@ class Candidate:
 
     committed отмечает уже предложенное и записанное в CRM значение: оно участвует в сведении,
     чтобы старое письмо не перезаписало более новое решение, но второй раз не предлагается.
+    grounds - цитаты, в сообщении которых есть само значение: None, если код не может это
+    проверить (значение не число), пусто, если числа нет ни в одном сообщении цитат.
     """
 
     purchase_id: str
@@ -51,6 +53,7 @@ class Candidate:
     event_id: str
     superseded: tuple[dict, ...] = ()
     committed: bool = False
+    grounds: tuple[dict, ...] | None = None
 
     @property
     def key(self) -> tuple[str, str]:
@@ -232,8 +235,31 @@ def derived_total(operations: list[dict], fields: dict) -> dict | None:
     }
 
 
+def derived_status(operations: list[dict], fields: dict) -> dict | None:
+    """Новое принятое количество меньше заказанного -> операция статуса partially_delivered.
+
+    Модель на 4B ставила этот статус и на сообщения без приемки, а на приемку забывала,
+    поэтому статус считает код. Для полной поставки отдельного статуса в CRM нет.
+    Совпадение с текущим статусом убирает build_proposals.
+    """
+    changed = {operation["field"]: operation for operation in operations if operation["op"] == "set_field"}
+    if "delivered_quantity" not in changed:
+        return None
+    delivered = to_decimal(changed["delivered_quantity"]["value"])
+    quantity = to_decimal(changed["quantity"]["value"] if "quantity" in changed else fields.get("quantity"))
+    if delivered is None or quantity is None or not 0 < delivered < quantity:
+        return None
+    return {
+        "op": "set_field",
+        "purchase_id": changed["delivered_quantity"]["purchase_id"],
+        "field": "status",
+        "value": "partially_delivered",
+        "evidence": list(changed["delivered_quantity"]["evidence"]),
+    }
+
+
 def to_operations(final: dict[tuple[str, str], Candidate], cards: dict) -> list[dict]:
-    """Новые согласованные значения -> операции set_field с цепочкой и производной суммой."""
+    """Новые согласованные значения -> операции set_field с цепочкой, производной суммой и статусом."""
     by_purchase = {}
     for candidate in sorted(final.values(), key=lambda item: item.key):
         if candidate.committed:
@@ -251,9 +277,9 @@ def to_operations(final: dict[tuple[str, str], Candidate], cards: dict) -> list[
     operations = []
     for purchase_id, purchase_operations in by_purchase.items():
         operations.extend(purchase_operations)
-        total = derived_total(purchase_operations, cards.get(purchase_id, {}).get("fields", {}))
-        if total is not None:
-            operations.append(total)
+        fields = cards.get(purchase_id, {}).get("fields", {})
+        derived = [derived_total(purchase_operations, fields), derived_status(purchase_operations, fields)]
+        operations.extend(operation for operation in derived if operation is not None)
     return operations
 
 
@@ -281,26 +307,28 @@ def gate_authority(
 ) -> tuple[list[Candidate], list[dict]]:
     """Кандидаты -> допущенные и вопросы закупщику о полномочиях.
 
-    Кандидат допущен, если хотя бы одна его цитата из реплики без проблемы полномочий.
+    Кандидат допущен, если хотя бы одна цитата, из которой взято значение, из реплики без
+    проблемы полномочий: посторонняя цитата уполномоченного автора чужое число не пропускает.
+    Число, которого нет ни в одном сообщении цитат (4B пишет его словами), могло прийти
+    из любой цитаты, поэтому такой кандидат допущен, только если проблем нет ни у одной.
     Вопрос задается только о значении, которое отличается от карточки.
     """
     allowed, issues = [], []
     for candidate in candidates:
-        problems = [
-            authority_problem(events[quote["event_id"]], candidate.field, registry) for quote in candidate.evidence
-        ]
-        if None in problems:
+        quotes = candidate.grounds or candidate.evidence
+        problems = [authority_problem(events[quote["event_id"]], candidate.field, registry) for quote in quotes]
+        passed = all(problem is None for problem in problems) if candidate.grounds == () else None in problems
+        if passed:
             allowed.append(candidate)
             continue
         current = cards.get(candidate.purchase_id, {}).get("fields", {}).get(candidate.field)
         if same_value(current, candidate.value):
             continue
-        issue = {
-            "code": problems[0],
-            "event_id": candidate.evidence[0]["event_id"],
-            "purchase_id": candidate.purchase_id,
-        }
-        if problems[0] == "conflicting_unconfirmed_claim":
+        code, event_id = next(
+            (problem, quote["event_id"]) for problem, quote in zip(problems, quotes, strict=True) if problem is not None
+        )
+        issue = {"code": code, "event_id": event_id, "purchase_id": candidate.purchase_id}
+        if code == "conflicting_unconfirmed_claim":
             issue["field"] = candidate.field
         if not any(
             known["code"] == issue["code"]

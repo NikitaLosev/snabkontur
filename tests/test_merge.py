@@ -4,7 +4,15 @@ from datetime import datetime
 
 import pytest
 
-from snab.merge import Candidate, authority_problem, derived_total, gate_authority, merge_candidates, to_operations
+from snab.merge import (
+    Candidate,
+    authority_problem,
+    derived_status,
+    derived_total,
+    gate_authority,
+    merge_candidates,
+    to_operations,
+)
 
 T1 = (datetime.fromisoformat("2026-11-03T10:15:00+03:00"), 900, 2)
 T2 = (datetime.fromisoformat("2026-11-03T11:10:00+03:00"), 4200, 8)
@@ -214,6 +222,41 @@ def test_derived_total(operations: list[dict], fields: dict, expected: str | Non
     assert (total and total["value"]) == expected
 
 
+RECEIVED = {
+    "op": "set_field",
+    "purchase_id": "P-1",
+    "field": "delivered_quantity",
+    "value": 4,
+    "evidence": [{"event_id": "e3", "quote": "Приняли 4 штуки"}],
+}
+
+
+@pytest.mark.parametrize(
+    ("operations", "fields", "expected"),
+    [
+        ([RECEIVED], {"quantity": 10, "status": "ordered"}, "partially_delivered"),
+        # Приняли все 10: отдельного статуса полной поставки в CRM нет
+        ([{**RECEIVED, "value": 10}], {"quantity": 10, "status": "ordered"}, None),
+        # Новое количество в том же пакете важнее карточки: 4 из 4 - уже не частичная
+        ([RECEIVED, {**QUANTITY, "value": 4}], {"quantity": 10}, None),
+        ([{**RECEIVED, "value": 0}], {"quantity": 10}, None),
+        # Без заказанного количества частичность не установить
+        ([RECEIVED], {}, None),
+        ([PRICE], {"quantity": 10}, None),
+    ],
+)
+def test_derived_status(operations: list[dict], fields: dict, expected: str | None) -> None:
+    status = derived_status(operations, fields)
+
+    assert (status and status["value"]) == expected
+
+
+def test_derived_status_cites_receipt() -> None:
+    status = derived_status([RECEIVED], {"quantity": 10})
+
+    assert status == {**RECEIVED, "field": "status", "value": "partially_delivered"}
+
+
 REGISTRY = {"Марина": {"can_confirm": ["budget"]}, "Стажёр": {"can_confirm": []}}
 
 
@@ -253,6 +296,30 @@ def test_unknown_speaker_change_becomes_issue_and_named_author_passes() -> None:
 
     assert allowed == [letter]
     assert issues == [{"code": "unknown_speaker_authority", "event_id": "e3", "purchase_id": "P-1"}]
+
+
+@pytest.mark.parametrize(
+    ("quote", "grounded"),
+    [
+        # 800000 есть только в реплике без прав
+        ("лимит теперь 800000", True),
+        # Число словами не нашлось ни в одном сообщении: источником могла быть любая цитата
+        ("лимит теперь восемьсот тысяч", False),
+    ],
+)
+def test_authorized_quote_without_the_value_does_not_pass_it(quote: str, grounded: bool) -> None:
+    # Марина подтвердила другой лимит
+    events = {"e1": {"id": "e1", "author": "Марина"}, "e2": {"id": "e2", "speaker_id": "SPEAKER_01"}}
+    cards = {"P-1": {"revision": 1, "fields": {"budget": "1000000.00"}}}
+    marina = {"event_id": "e1", "quote": "подтвердил лимит 1000000"}
+    voice = {"event_id": "e2", "quote": quote}
+    grounds = (voice,) if grounded else ()
+    pooled = Candidate("P-1", "budget", "800000.00", "agreed", (marina, voice), T1, "e2", grounds=grounds)
+
+    allowed, issues = gate_authority([pooled], events, REGISTRY, cards)
+
+    assert allowed == []
+    assert issues == [{"code": "unknown_speaker_authority", "event_id": "e2", "purchase_id": "P-1"}]
 
 
 def test_unknown_speaker_repeating_card_value_asks_nothing() -> None:

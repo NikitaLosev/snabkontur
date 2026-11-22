@@ -9,7 +9,7 @@
 - open_questions: нерешенные вопросы прошлых кусков: code, purchase_id, event_id, text
 - authority_registry: права авторов
 
-Верни JSON с полями changes (операции) и issues.
+Верни JSON с полями changes (операции) и issues. Каждая операция начинается с action: set_field, create_task или update_task.
 
 Статус каждой set_field:
 - agreed - стороны договорились или подтвердили: "берём", "согласовали", "подтвердили", "на этом сошлись"
@@ -18,10 +18,10 @@
 Возвращай все условия куска, в том числе предложения: что войдет в дифф, решает код. Вопросы и фразы "возможно" операций не дают.
 
 Правила:
-- set_field: purchase_id, field, value, status. Поля: unit_price, total_amount, budget, delivery_cost, quantity, delivered_quantity, prepayment_percent, vat_rate, price_includes_vat, currency, unit, delivery_date, shipment_date, supplier, status.
+- set_field: purchase_id, field, value, status. Поля: unit_price, total_amount, budget, delivery_cost, quantity, delivered_quantity, prepayment_percent, vat_rate, price_includes_vat, currency, unit, delivery_date, shipment_date, supplier. Статус карточки код выводит сам по delivered_quantity.
 - Деньги - строка с двумя знаками после точки, например "12500.00"; валюта отдельно в currency: RUB, EUR или USD. Количество и проценты - целые числа. Даты - YYYY-MM-DD, относительные даты считай от occurred_at сообщения.
 - Цена и условие оплаты связаны. "Вся сумма вперёд", "полная предоплата", "всё до отгрузки", "полный аванс" - prepayment_percent 100; "оплата после получения" - 0. Принятие условного предложения из draft - agreed и для цены, и для ее условия.
-- Приемка части заказа: delivered_quantity - всего принято по заказу, status "partially_delivered".
+- Приемка части заказа: delivered_quantity - всего принято по заказу.
 - Не повторяй значение, которое уже стоит в карточке, если в куске его не пересогласовали.
 - Повтор или пересылка уже учтенного сообщения - не новое изменение.
 - Просьба отменить подтвержденное изменение или вернуть прежнее значение без нового значения - не операция: откат делает закупщик.

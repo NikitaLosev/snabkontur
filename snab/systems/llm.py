@@ -26,10 +26,36 @@ from typing import Any, Literal
 from pydantic import BaseModel, ValidationError
 
 from snab.contracts import EpisodeContext, StopReason, SystemOutput, ToolResult, TraceStep
-from snab.merge import Candidate, Merge, event_order, gate_authority, merge_candidates, same_value, to_operations
-from snab.systems.rules import build_proposals
+from snab.merge import (
+    Candidate,
+    Merge,
+    event_order,
+    gate_authority,
+    merge_candidates,
+    same_value,
+    to_decimal,
+    to_operations,
+)
+from snab.systems.rules import (
+    AMOUNT,
+    CONDITIONS_QUERY_RE,
+    CURRENCY,
+    DATE_RE,
+    QUANTITY_RE,
+    SCALE,
+    SUMMARY_QUERY_RE,
+    build_proposals,
+    code_answer,
+    currency_code,
+    open_tasks,
+    parse_amount,
+    resolve_date,
+)
 from snab.tools import PURCHASE_ID, ModelTools, same_stem, words
 
+# Версия кода системы в описании прогона, внутри ступеней B1 и S1 раздела 8. В s1.1 код, а не модель,
+# считает сводку, ответы по полям и задачам, статус, валюту, единицу и вопрос о времени сообщения
+SYSTEM_VERSION = "s1.1"
 OLLAMA_URL = "http://localhost:11434"
 MODEL = "qwen3:4b-instruct-2507-q4_K_M"
 TEMPERATURE = 0
@@ -58,6 +84,17 @@ TOOL_STOP_REASONS = {"timeout": StopReason.TOOL_ERROR, "budget_exhausted": StopR
 LINKING_ISSUES = frozenset({"ambiguous_purchase", "purchase_not_found"})
 # Вопросы, на которые может ответить следующий кусок: их текст идет в open_questions
 OPEN_QUESTION_CODES = frozenset({"tool_timeout", "step_budget_exhausted", "ambiguous_purchase", "purchase_not_found"})
+MONEY_FIELDS = frozenset({"unit_price", "total_amount", "budget", "delivery_cost"})
+DATE_FIELDS = frozenset({"delivery_date", "shipment_date"})
+NUMBER_RE = re.compile(AMOUNT + SCALE, re.IGNORECASE)
+CURRENCY_RE = re.compile(CURRENCY, re.IGNORECASE)
+# Вопрос о поручениях: answer.md разрешает модели только поля карточки, задачи отдает код
+TASKS_QUERY_RE = re.compile(r"\bдолж(?:ен|на|ны)\b|поруч|\bзадач|\bкто отвечает", re.IGNORECASE)
+# Кто, почему и откуда значение, что было раньше и в каком письме: полей карточки для ответа
+# мало, отвечает модель
+MODEL_QUERY_RE = re.compile(
+    r"\bкто\b|почему|откуда|основан|доказательств|изменил|в начале|ранн\w* истори|письм", re.IGNORECASE
+)
 TOOL_SCHEMAS = [
     {
         "type": "function",
@@ -112,12 +149,31 @@ class Quote(BaseModel):
     quote: str
 
 
+# Поля карточки, которые модель достает из текста; статус карточки и сумму считает код
+CardField = Literal[
+    "unit_price",
+    "total_amount",
+    "budget",
+    "delivery_cost",
+    "quantity",
+    "delivered_quantity",
+    "prepayment_percent",
+    "vat_rate",
+    "price_includes_vat",
+    "currency",
+    "unit",
+    "delivery_date",
+    "shipment_date",
+    "supplier",
+]
+
+
 class SetField(BaseModel):
     """Кандидат нового значения поля со статусом договоренности."""
 
-    op: Literal["set_field"]
+    action: Literal["set_field"]
     purchase_id: str
-    field: str
+    field: CardField
     value: str | int | float | bool | None
     status: Literal["agreed", "offer", "conditional"]
     evidence: list[Quote]
@@ -126,7 +182,7 @@ class SetField(BaseModel):
 class CreateTask(BaseModel):
     """Новое поручение по закупке."""
 
-    op: Literal["create_task"]
+    action: Literal["create_task"]
     purchase_id: str
     title: str
     owner: str | None
@@ -140,13 +196,13 @@ class TaskChanges(BaseModel):
     title: str | None = None
     owner: str | None = None
     due_date: str | None = None
-    status: str | None = None
+    status: Literal["open", "done", "cancelled"] | None = None
 
 
 class UpdateTask(BaseModel):
     """Изменение существующей задачи."""
 
-    op: Literal["update_task"]
+    action: Literal["update_task"]
     task_id: str
     fields: TaskChanges
     evidence: list[Quote]
@@ -165,6 +221,8 @@ class Extraction(BaseModel):
 
     Ollama выводит поля схемы по алфавиту: с именем operations модель сначала писала issues
     и объявляла согласованный срок противоречием, поэтому список операций называется changes.
+    По той же причине вид операции называется action: с ключом op первым шел evidence,
+    после него грамматика не пускала к create_task, и задачи уходили в set_field.
     """
 
     changes: list[SetField | CreateTask | UpdateTask]
@@ -396,6 +454,21 @@ def task_operation(extracted: CreateTask | UpdateTask, evidence: list[dict]) -> 
     return {"op": "update_task", "task_id": extracted.task_id, "fields": fields, "evidence": evidence}
 
 
+def value_quotes(value: object, evidence: list[dict], events: dict[str, dict]) -> tuple[dict, ...] | None:
+    """Цитаты, в сообщении которых есть число value с учетом "млн" и "тыс"; для не числа None.
+
+    Проверяется все сообщение: модель часто цитирует соседнюю фразу того же сообщения.
+    """
+    number = to_decimal(value)
+    if number is None:
+        return None
+    return tuple(
+        quote
+        for quote in evidence
+        if number in {parse_amount(match) for match in NUMBER_RE.finditer(events[quote["event_id"]]["text"])}
+    )
+
+
 def latest_event(evidence: list[dict], events: dict[str, dict]) -> dict:
     """Самое позднее событие среди цитат: по нему кандидат упорядочивается."""
     return max((events[quote["event_id"]] for quote in evidence), key=event_order)
@@ -422,9 +495,107 @@ def read_extraction(reply: Extraction, events: dict[str, dict]) -> tuple[list[Ca
                 evidence=tuple(evidence),
                 order=event_order(deciding),
                 event_id=deciding["id"],
+                grounds=value_quotes(extracted.value, evidence, events),
             )
         )
     return candidates, tasks, dropped
+
+
+def undated_event(candidate: Candidate, events: dict[str, dict]) -> str | None:
+    """Дата кандидата не следует из цитат, а дату в цитате без времени сообщения не посчитать -> ID сообщения."""
+    undated = None
+    for quote in candidate.evidence:
+        occurred_at = events[quote["event_id"]].get("occurred_at")
+        for match in DATE_RE.finditer(quote["quote"]):
+            resolved = resolve_date(match, occurred_at)
+            if resolved is None:
+                undated = quote["event_id"]
+            elif resolved.isoformat() == candidate.value:
+                return None
+    return undated
+
+
+def check_grounding(candidates: list[Candidate], events: dict[str, dict]) -> tuple[list[Candidate], list[dict], int]:
+    """Кандидаты -> допустимые значения, вопросы о времени сообщения и число отброшенных денег не числом.
+
+    Цитата проверена только на дословность: 4B писала в цену "неразборчиво" и считала
+    "завтра" от неизвестной даты. Такие значения код не предлагает, а на дату закупщик
+    получает вопрос missing_source_time. Сверка денег с числами сообщений на записанном
+    прогоне dev теряла верные значения: модель цитирует не то сообщение и пишет числа словами.
+    """
+    kept, issues, not_number = [], [], 0
+    for candidate in candidates:
+        if candidate.field in MONEY_FIELDS and to_decimal(candidate.value) is None:
+            not_number += 1
+            continue
+        undated = undated_event(candidate, events) if candidate.field in DATE_FIELDS else None
+        if undated is None:
+            kept.append(candidate)
+            continue
+        issue = {"code": "missing_source_time", "event_id": undated, "purchase_id": candidate.purchase_id}
+        if issue not in issues:
+            issues.append(issue)
+    return kept, issues, not_number
+
+
+def token_quotes(operations: list[dict], events: dict[str, dict], pattern: re.Pattern) -> list[tuple[dict, str]]:
+    """Цитаты операций со словом pattern и само слово; если в цитатах его нет - целые сообщения цитат."""
+    quotes = [quote for operation in operations for quote in operation["evidence"]]
+    found = [(quote, match.group(0)) for quote in quotes for match in pattern.finditer(quote["quote"])]
+    if found:
+        return found
+    texts = {quote["event_id"]: events[quote["event_id"]]["text"] for quote in quotes}
+    return [
+        ({"event_id": event_id, "quote": text}, match.group(0))
+        for event_id, text in texts.items()
+        for match in pattern.finditer(text)
+    ]
+
+
+def unique_quotes(found: list[tuple[dict, str]]) -> list[dict]:
+    """Цитаты без повторов в исходном порядке."""
+    quotes = [quote for quote, _ in found]
+    return [quote for index, quote in enumerate(quotes) if quote not in quotes[:index]]
+
+
+def derived_units(operations: list[dict], cards: dict, events: dict[str, dict]) -> tuple[list[dict], list[dict]]:
+    """Деньги и количество без валюты и единицы -> операции currency и unit по словам цитат; без валюты - вопрос.
+
+    4B почти не выводит валюту и единицу отдельной операцией, а "рублей" и "штук" рядом
+    с числом код находит сам, как B0. Деньги, равные карточке, build_proposals не предложит,
+    поэтому о валюте для них не спрашиваем. Единица в разметке ставится только вместе
+    с первым количеством карточки: при смене количества ее нет.
+    """
+    derived, issues = [], []
+    by_purchase = {}
+    for operation in operations:
+        if operation["op"] == "set_field":
+            by_purchase.setdefault(operation["purchase_id"], {})[operation["field"]] = operation
+    for purchase_id, changed in by_purchase.items():
+        fields = cards.get(purchase_id, {}).get("fields", {})
+        money = [
+            changed[name]
+            for name in sorted(MONEY_FIELDS)
+            if name in changed and not same_value(fields.get(name), changed[name]["value"])
+        ]
+        if money and "currency" not in changed:
+            found = token_quotes(money, events, CURRENCY_RE)
+            codes = {currency_code(token.strip()) for _, token in found}
+            if len(codes) == 1:
+                derived.append(field_operation(purchase_id, "currency", codes.pop(), unique_quotes(found)))
+            elif not found and fields.get("currency") is None:
+                event_id = money[-1]["evidence"][-1]["event_id"]
+                issues.append({"code": "missing_currency", "event_id": event_id, "purchase_id": purchase_id})
+        if "quantity" in changed and "unit" not in changed and fields.get("quantity") is None:
+            found = token_quotes([changed["quantity"]], events, QUANTITY_RE)
+            if found:
+                derived.append(field_operation(purchase_id, "unit", "шт", unique_quotes(found)))
+    return [*operations, *derived], issues
+
+
+def field_operation(purchase_id: str, field_name: str, value: str, evidence: list[dict]) -> dict:
+    """Операция set_field, выведенная кодом."""
+    return {"op": "set_field", "purchase_id": purchase_id, "field": field_name, "value": value, "evidence": evidence}
 
 
 def llm_step(args: dict, prompt_text: str, response: dict | None, started: float, error: str | None) -> TraceStep:
@@ -474,6 +645,7 @@ class LlmSystem:
             schemas["tools"] = TOOL_SCHEMAS
         return {
             "system": self.name,
+            "system_version": SYSTEM_VERSION,
             "model": MODEL,
             "model_digest": self.client.model_digest(MODEL),
             "temperature": TEMPERATURE,
@@ -532,7 +704,14 @@ class LlmSystem:
         return self.assemble(context, session, tools, reply, steps, branch.failed_tool)
 
     def answer_query(self, context: EpisodeContext, query: dict, tools: ModelTools) -> SystemOutput:
-        """Вопрос закупщика -> ответ модели по текущей CRM."""
+        """Вопрос закупщика -> ответ кодом, если он сводится к сводке, полям или задачам карточки, иначе модели."""
+        answer = route_answer(query["text"], context.crm_state, context.now)
+        if answer is not None:
+            # Для сводки и просмотра карточки модель не нужна (раздел 2 design doc): 4B на сводке
+            # возвращала поля карточки вместо окна и задач
+            step = TraceStep(kind="system", name="code_answer", args={"query_id": query["id"]}, result=answer)
+            answers = [{"query_id": query["id"], "answer": answer, "evidence": []}]
+            return SystemOutput(answers=answers, trace_steps=[step])
         request, stats = query_request(context, query, estimate_tokens(PROMPTS["answer"]))
         messages = [
             {"role": "system", "content": PROMPTS["answer"]},
@@ -690,7 +869,9 @@ class LlmSystem:
         events = {event["id"]: event for event in context.seen_events}
         cards = context.crm_state["purchases"]
         candidates, tasks, dropped = read_extraction(reply, events)
-        candidates, issues = gate_authority(candidates, events, context.authority_registry, cards)
+        candidates, issues, not_number = check_grounding(candidates, events)
+        candidates, authority_issues = gate_authority(candidates, events, context.authority_registry, cards)
+        issues += authority_issues
         if failed_tool is not None:
             candidates, held_issues = hold_unlinked(candidates, context, failed_tool)
             issues += held_issues
@@ -707,7 +888,8 @@ class LlmSystem:
             if same_value(cards.get(candidate.purchase_id, {}).get("fields", {}).get(candidate.field), candidate.value)
         ]
         merged = merge_candidates([*committed, *held, *ready_new])
-        operations = to_operations(merged.final, cards)
+        operations, unit_issues = derived_units(to_operations(merged.final, cards), cards, events)
+        issues += unit_issues
         ready_tasks = [
             task for task in tasks if source_of(events[task["evidence"][-1]["event_id"]]) not in open_sources
         ]
@@ -729,6 +911,7 @@ class LlmSystem:
                 args={"open_sources": sorted(open_sources), "closing_sources": sorted(closing)},
                 result={
                     "dropped_without_quote": dropped,
+                    "dropped_not_number": not_number,
                     "final": [[*key, candidate.value, candidate.status] for key, candidate in merged.final.items()],
                     "pending": [[*candidate.key, candidate.value, candidate.status] for candidate in merged.pending],
                     "drafts": {source: len(items) for source, items in session.drafts.items()},
@@ -742,15 +925,41 @@ class LlmSystem:
         return SystemOutput(proposals=proposals, issues=issues, trace_steps=steps, stop_reason=stop_reason)
 
 
+def route_answer(text: str, state: dict, now: str | None) -> dict | None:
+    """Вопрос -> ответ кодом по CRM; None, если отвечать должна модель.
+
+    Сводку и действующие условия код собирает целиком. Вопрос о поручении ("кто и к какому
+    сроку должен") идет к задачам раньше полей: иначе "срок" в нем дал бы дату поставки.
+    """
+    if SUMMARY_QUERY_RE.search(text) or CONDITIONS_QUERY_RE.search(text):
+        return code_answer(text, state, now)
+    if TASKS_QUERY_RE.search(text):
+        return tasks_answer(text, state)
+    if MODEL_QUERY_RE.search(text):
+        return None
+    return code_answer(text, state, now)
+
+
+def tasks_answer(text: str, state: dict) -> dict | None:
+    """Вопрос, кто что должен сделать по названной закупке -> ее открытые задачи из CRM."""
+    named = [pid for pid in PURCHASE_ID.findall(text) if pid in state["purchases"]]
+    if not named:
+        return None
+    return {"tasks": open_tasks(list(state["tasks"].values()), named[0])}
+
+
 def keeps_issue(issue: ExtractedIssue, proposals: list[dict], context: EpisodeContext) -> bool:
     """Проверка вопроса модели кодом: вопросы, которые ставит код или опровергает сам кусок, отбрасываются.
 
-    Вопрос о привязке не нужен сообщению с номером существующей закупки. Пакет по закупке
-    и есть разрешение противоречия: оставшиеся противоречия находит сведение.
+    Вопрос о привязке не нужен сообщению с номером существующей закупки, а без event_id
+    закупщику не на что ответить. Пакет по закупке и есть разрешение противоречия:
+    оставшиеся противоречия находит сведение.
     """
     if issue.code in CODE_ISSUES:
         return False
     if issue.code in LINKING_ISSUES:
+        if issue.event_id is None:
+            return False
         texts = [event["text"] for event in context.events if event["id"] == issue.event_id]
         return not mentioned_purchases(texts, context.crm_state["purchases"])
     proposed = {pid for proposal in proposals for pid in proposal["based_on"]}

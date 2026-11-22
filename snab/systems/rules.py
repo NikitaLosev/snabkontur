@@ -369,12 +369,16 @@ def build_proposals(operations: list[dict], context: EpisodeContext, system_name
     return proposals
 
 
+def open_tasks(tasks: list[dict], purchase_id: str) -> list[dict]:
+    """Открытые задачи закупки."""
+    return [task for task in tasks if task["purchase_id"] == purchase_id and task["status"] == "open"]
+
+
 def answer_fields(query: str, card: dict, tasks: list[dict], purchase_id: str) -> dict | None:
     """Ответ по полям карточки, если вопрос сводится к ним."""
     fields = card["fields"]
     if CONDITIONS_QUERY_RE.search(query):
-        open_tasks = [task for task in tasks if task["purchase_id"] == purchase_id and task["status"] == "open"]
-        return {"fields": fields, "tasks": open_tasks}
+        return {"fields": fields, "tasks": open_tasks(tasks, purchase_id)}
     unknown = [name for pattern, name in UNKNOWN_QUERY_FIELDS if pattern.search(query) and name not in fields]
     if unknown:
         return {**dict.fromkeys(unknown), "status": "unknown"}
@@ -386,6 +390,16 @@ def answer_fields(query: str, card: dict, tasks: list[dict], purchase_id: str) -
         quantity, delivered = fields.get("quantity"), fields.get("delivered_quantity")
         answer["remaining_quantity"] = None if quantity is None or delivered is None else quantity - delivered
     return answer
+
+
+def code_answer(text: str, state: dict, now: str | None) -> dict | None:
+    """Вопрос -> утренняя сводка или поля названной закупки из CRM; None, если вопрос не сводится к ним."""
+    if SUMMARY_QUERY_RE.search(text) and now:
+        return morning_summary(state, now)
+    named = [pid for pid in PURCHASE_ID.findall(text) if pid in state["purchases"]]
+    if not named:
+        return None
+    return answer_fields(text, state["purchases"][named[0]], list(state["tasks"].values()), named[0])
 
 
 class RuleSystem:
@@ -422,15 +436,6 @@ class RuleSystem:
 
     def answer_query(self, context: EpisodeContext, query: dict, tools: ModelTools) -> SystemOutput:
         """Вопрос пользователя -> ответ по текущей CRM, если он очевиден."""
-        state, text = context.crm_state, query["text"]
-        if SUMMARY_QUERY_RE.search(text) and context.now:
-            answer = morning_summary(state, context.now)
-        else:
-            named = [pid for pid in PURCHASE_ID.findall(text) if pid in state["purchases"]]
-            answer = (
-                answer_fields(text, state["purchases"][named[0]], list(state["tasks"].values()), named[0])
-                if named
-                else None
-            )
+        answer = code_answer(query["text"], context.crm_state, context.now)
         answers = [] if answer is None else [{"query_id": query["id"], "answer": answer, "evidence": []}]
         return SystemOutput(answers=answers)
