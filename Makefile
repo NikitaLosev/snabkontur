@@ -6,8 +6,8 @@ REPEAT ?= 3
 # от первого (D-WOR-01), сбой поиска (D-WOR-16), лимит шагов (D-WOR-17), старое письмо
 # после нового (D-WOR-04), повтор (D-WOR-07), откат (D-WOR-06), неизвестный голос (D-WOR-14)
 SCENARIOS_FILE := eval/scenarios_kt3.txt
-# S1 и B1 по умолчанию; make scenarios SYSTEM=rules гоняет одну систему
-SCENARIO_SYSTEMS ?= agent llm_single
+# S1.2, S1 и B1 по умолчанию; make scenarios SYSTEM=rules гоняет одну систему
+SCENARIO_SYSTEMS ?= hybrid agent llm_single
 ifeq ($(origin SYSTEM),command line)
 SCENARIO_SYSTEMS := $(SYSTEM)
 endif

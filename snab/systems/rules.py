@@ -100,9 +100,11 @@ PREPAYMENT_RE = re.compile(
     re.IGNORECASE,
 )
 VAT_RE = re.compile(r"(?:(?P<prefix>\b[сС]|\bбез)\s+)?НДС\s*(?P<rate>\d+)\s*%(?P<included>\s*включ\w*)?")
+# Слова договоренности: B0 берет по ним дату поставки, s1.2 отмечает факт как явно согласованный
+AGREEMENT_CUES = r"согласова\w*|договорил\w*|подтвер\w*|фиксируем"
 DELIVERY_CUE_RE = re.compile(
     r"постав\w*|привез\w*|привоз\w*|везём|везем|доставк\w*|срок\w*|ждёт|ждём|ждем|приедет|машин\w*|"
-    r"перенос\w*|перенесли|сдвинули|согласова\w*|договорил\w*|подтвер\w*|фиксируем|(?P<shipment>отгруз\w*)",
+    r"перенос\w*|перенесли|сдвинули|" + AGREEMENT_CUES + r"|(?P<shipment>отгруз\w*)",
     re.IGNORECASE,
 )
 REPLACED_DATE_RE = re.compile(r"вместо\s*$", re.IGNORECASE)
@@ -267,16 +269,20 @@ def link_event(event: dict, tools: ModelTools, issues: list[dict], episode_id: s
     return None, error.code
 
 
-def event_operations(event: dict, context: EpisodeContext, tools: ModelTools, issues: list[dict]) -> tuple:
-    """Операции одного сообщения по закупкам и код ошибки инструмента, если был."""
-    text, occurred_at = event["text"], event.get("occurred_at")
-    tasks = find_tasks(text)
+def find_facts(
+    text: str, tasks: list[dict], occurred_at: str | None, keep_conditional: bool = False
+) -> tuple[list[tuple], list[str]]:
+    """Факты текста вне задач как (позиция, поле, значение, начало, конец) и коды проблем.
+
+    B0 пропускает фразы с оговорками: изменений они не дают. Подсказкам модели в s1.2 нужны
+    и они: предложение это или договоренность, решает модель.
+    """
     masked = text
     for task in tasks:
         masked = masked[: task["start"]] + " " * (task["end"] - task["start"]) + masked[task["end"] :]
     facts, problems = [], []
     for clause in iter_clauses(masked):
-        if CONDITIONAL_RE.search(clause.group(0)):
+        if not keep_conditional and CONDITIONAL_RE.search(clause.group(0)):
             continue
         clause_facts, clause_problems = extract_clause_facts(clause.group(0), occurred_at)
         problems.extend(clause_problems)
@@ -284,6 +290,14 @@ def event_operations(event: dict, context: EpisodeContext, tools: ModelTools, is
         facts.extend(
             (pos + offset, field, value, start + offset, end + offset) for pos, field, value, start, end in clause_facts
         )
+    return facts, problems
+
+
+def event_operations(event: dict, context: EpisodeContext, tools: ModelTools, issues: list[dict]) -> tuple:
+    """Операции одного сообщения по закупкам и код ошибки инструмента, если был."""
+    text, occurred_at = event["text"], event.get("occurred_at")
+    tasks = find_tasks(text)
+    facts, problems = find_facts(text, tasks, occurred_at)
     tool_error = None
     linked = None
     if (facts or tasks or problems) and not PURCHASE_ID.search(text):

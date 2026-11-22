@@ -1,10 +1,12 @@
-"""LLM-системы на нативном Ollama: llm_single (B1) и agent (S1) через один путь кода.
+"""LLM-системы на нативном Ollama: llm_single (B1), agent (S1) и hybrid (S1.2) через один путь кода.
 
-Обе системы получают кусок (эпизод раннера), подтвержденные карточки как базу только для
+Все системы получают кусок (эпизод раннера), подтвержденные карточки как базу только для
 чтения, черновик встречи из прошлых кусков того же источника и открытые вопросы, а модель
 возвращает кандидатов изменений по JSON-схеме. S1 отличается одной ограниченной развилкой
 из раздела 5 design doc: если в куске нет номера закупки или он ссылается на прежние
 условия, модель до итогового диффа может вызвать до двух инструментов только для чтения.
+В hybrid ту же развилку решает код: он сам вызывает инструменты, привязывает сообщения
+и дает модели кандидатов фактов из правил B0, а модель только решает, что из них договоренность.
 
 Кандидатов сводит код (snab.merge): проверка цитат и полномочий, сведение по ключу
 (purchase_id, field), предложения только после завершения источника. Каждый вызов модели
@@ -37,7 +39,9 @@ from snab.merge import (
     to_operations,
 )
 from snab.systems.rules import (
+    AGREEMENT_CUES,
     AMOUNT,
+    CONDITIONAL_RE,
     CONDITIONS_QUERY_RE,
     CURRENCY,
     DATE_RE,
@@ -47,15 +51,20 @@ from snab.systems.rules import (
     build_proposals,
     code_answer,
     currency_code,
+    find_facts,
+    find_tasks,
+    iter_clauses,
     open_tasks,
     parse_amount,
     resolve_date,
 )
-from snab.tools import PURCHASE_ID, ModelTools, same_stem, words
+from snab.tools import DESCRIPTIVE_FIELDS, PURCHASE_ID, ModelTools, same_stem, words
 
 # Версия кода системы в описании прогона, внутри ступеней B1 и S1 раздела 8. В s1.1 код, а не модель,
 # считает сводку, ответы по полям и задачам, статус, валюту, единицу и вопрос о времени сообщения
 SYSTEM_VERSION = "s1.1"
+# s1.2: поиск, привязку и прежние сообщения решает код, правила B0 дают модели кандидатов фактов
+HYBRID_VERSION = "s1.2"
 OLLAMA_URL = "http://localhost:11434"
 MODEL = "qwen3:4b-instruct-2507-q4_K_M"
 TEMPERATURE = 0
@@ -86,6 +95,20 @@ LINKING_ISSUES = frozenset({"ambiguous_purchase", "purchase_not_found"})
 OPEN_QUESTION_CODES = frozenset({"tool_timeout", "step_budget_exhausted", "ambiguous_purchase", "purchase_not_found"})
 MONEY_FIELDS = frozenset({"unit_price", "total_amount", "budget", "delivery_cost"})
 DATE_FIELDS = frozenset({"delivery_date", "shipment_date"})
+# Числа и даты, которые в hybrid модель не может выдумать: они есть в кандидатах правил или
+# в цитате. delivered_quantity - накопленный итог по заказу, его модель складывает сама
+GROUNDED_FIELDS = MONEY_FIELDS | DATE_FIELDS | {"quantity"}
+# Валюту и единицу выводит derived_units по словам цитат: в подсказках модели они лишние
+DERIVED_FIELDS = frozenset({"currency", "unit"})
+# Явная договоренность во фразе без оговорок: такой факт, пропущенный моделью, идет в счетчик трейса
+AGREED_RE = re.compile(AGREEMENT_CUES + r"|сошлись|бер[её]м", re.IGNORECASE)
+# Число словами ("двенадцать пятьсот") правила не разбирают: такое значение код проверить не может.
+# "один/одна/одну" нет: в "по 125 рублей за одну" это счет единицы, а не значение
+NUMBER_WORD_RE = re.compile(
+    r"\b(?:два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|\w+надцать|двадцать|тридцать"
+    r"|сорок|\w+десят|девяносто|сто|двести|триста|\w+сот|тысяч\w*|миллион\w*)\b",
+    re.IGNORECASE,
+)
 NUMBER_RE = re.compile(AMOUNT + SCALE, re.IGNORECASE)
 CURRENCY_RE = re.compile(CURRENCY, re.IGNORECASE)
 # Вопрос о поручениях: answer.md разрешает модели только поля карточки, задачи отдает код
@@ -269,7 +292,8 @@ class Session:
 
     drafts - кандидаты незавершенных источников, draft_issues - их противоречия до конца
     источника, committed - последние предложенные значения
-    по ключу, open_questions - нерешенные вопросы прошлых кусков.
+    по ключу, open_questions - нерешенные вопросы прошлых кусков, links - привязки hybrid
+    по ID сообщения: черновик встречи предлагается куском, где этой привязки уже нет.
     """
 
     seen: list[tuple[str, str]] = field(default_factory=list)
@@ -278,6 +302,7 @@ class Session:
     draft_issues: dict[str, list[dict]] = field(default_factory=dict)
     committed: dict[tuple[str, str], Candidate] = field(default_factory=dict)
     open_questions: list[dict] = field(default_factory=list)
+    links: dict[str, dict] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -287,6 +312,28 @@ class Branch:
     messages: list[dict]
     steps: list[TraceStep]
     stop_reason: StopReason | None = None
+    failed_tool: dict | None = None
+
+
+@dataclass(frozen=True)
+class TextFact:
+    """Факт правил B0 в сообщении куска; agreed - фраза без оговорок с явным словом договоренности."""
+
+    event_id: str
+    field: str
+    value: str | int | bool
+    quote: str
+    agreed: bool
+
+
+@dataclass(frozen=True)
+class CodeHints:
+    """Что hybrid решил кодом до модели: привязка сообщений, прежние сообщения, факты правил, сбой поиска."""
+
+    links: list[dict]
+    earlier: list[dict]
+    facts: list[TextFact]
+    step: TraceStep
     failed_tool: dict | None = None
 
 
@@ -394,8 +441,10 @@ def mentioned_purchases(texts: list[str], cards: dict) -> set[str]:
     return {pid for text in texts for pid in PURCHASE_ID.findall(text or "") if pid in cards}
 
 
-def episode_request(context: EpisodeContext, session: Session, fixed_tokens: int) -> tuple[dict, dict]:
-    """Вход куска: кусок, подтвержденные карточки, черновик того же источника и открытые вопросы."""
+def episode_request(
+    context: EpisodeContext, session: Session, fixed_tokens: int, hints: CodeHints | None = None
+) -> tuple[dict, dict]:
+    """Вход куска: кусок, подтвержденные карточки, черновик того же источника, открытые вопросы и подсказки кода."""
     state = context.crm_state
     sources = {source_of(event) for event in context.events}
     draft = [draft_entry(candidate) for source in sorted(sources) for candidate in session.drafts.get(source, [])]
@@ -412,6 +461,11 @@ def episode_request(context: EpisodeContext, session: Session, fixed_tokens: int
     text = " ".join(event["text"] for event in context.events)
     targets = mentioned_purchases([text], state["purchases"])
     targets |= {item["purchase_id"] for item in [*draft, *questions] if item.get("purchase_id")}
+    if hints is not None:
+        facts = [{key: getattr(fact, key) for key in ("event_id", "field", "value", "quote")} for fact in hints.facts]
+        request.update(links=hints.links, earlier=hints.earlier, candidates=facts)
+        # Привязанная кодом карточка нужна модели так же, как названная в тексте
+        targets |= {link["purchase_id"] for link in hints.links if link["purchase_id"]}
     return trim_request(request, fixed_tokens, targets, text)
 
 
@@ -515,27 +569,78 @@ def undated_event(candidate: Candidate, events: dict[str, dict]) -> str | None:
     return undated
 
 
-def check_grounding(candidates: list[Candidate], events: dict[str, dict]) -> tuple[list[Candidate], list[dict], int]:
-    """Кандидаты -> допустимые значения, вопросы о времени сообщения и число отброшенных денег не числом.
+def quote_dates(candidate: Candidate, events: dict[str, dict]) -> list[str]:
+    """Даты цитат кандидата в ISO; дата без времени сообщения не считается."""
+    resolved = (
+        resolve_date(match, events[quote["event_id"]].get("occurred_at"))
+        for quote in candidate.evidence
+        for match in DATE_RE.finditer(quote["quote"])
+    )
+    return [day.isoformat() for day in resolved if day is not None]
+
+
+def is_worded_number(quote: str) -> bool:
+    """В цитате есть число словами ("двенадцать пятьсот"); "12 тысяч" с цифрой разбирает NUMBER_RE."""
+    return NUMBER_WORD_RE.search(NUMBER_RE.sub(" ", quote)) is not None
+
+
+def is_grounded(
+    candidate: Candidate, facts: list[TextFact], drafted: tuple[Candidate, ...], events: dict[str, dict]
+) -> bool:
+    """Значение есть в сообщениях цитат (число) или в цитатах (дата), среди фактов правил куска или в черновике.
+
+    Факты берутся со всего куска: на реплее S1.1 модель цитировала соседнее сообщение
+    (D-DEC-08), а число из куска все равно не выдумано. Черновик по тому же ключу нужен для
+    принятия на встрече без числа ("на этом сошлись"): значение пришло из прошлого куска той же
+    записи и тогда уже прошло проверку. Цитату с числом словами код не проверяет: на реплее так
+    терялись верные цена и количество E21 и D-EXT-01, где слова соседствуют с номером закупки
+    и другими цифрами. "За одну" и "12 тысяч" числом словами не считаются: иначе частые слова
+    выключали бы сверку.
+    """
+    if candidate.grounds or any(is_worded_number(quote["quote"]) for quote in candidate.evidence):
+        return True
+    pool = [fact.value for fact in facts]
+    pool += [draft.value for draft in drafted if draft.key == candidate.key]
+    if candidate.field in DATE_FIELDS:
+        pool += quote_dates(candidate, events)
+    return any(same_value(value, candidate.value) for value in pool)
+
+
+def check_grounding(
+    candidates: list[Candidate],
+    events: dict[str, dict],
+    facts: list[TextFact] | None = None,
+    drafted: tuple[Candidate, ...] = (),
+) -> tuple[list[Candidate], list[dict], int, int]:
+    """Кандидаты -> допустимые значения, вопросы о времени сообщения, число денег не числом и невыведенных чисел.
 
     Цитата проверена только на дословность: 4B писала в цену "неразборчиво" и считала
     "завтра" от неизвестной даты. Такие значения код не предлагает, а на дату закупщик
     получает вопрос missing_source_time. Сверка денег с числами сообщений на записанном
     прогоне dev теряла верные значения: модель цитирует не то сообщение и пишет числа словами.
+    Поэтому сверку денег, количества и даты делает только hybrid (facts не None): там модель
+    видит кандидатов правил и цитирует их, а число вне кандидатов и цитат считается выдуманным.
     """
-    kept, issues, not_number = [], [], 0
+    kept, issues, not_number, ungrounded = [], [], 0, 0
     for candidate in candidates:
         if candidate.field in MONEY_FIELDS and to_decimal(candidate.value) is None:
             not_number += 1
             continue
         undated = undated_event(candidate, events) if candidate.field in DATE_FIELDS else None
-        if undated is None:
-            kept.append(candidate)
+        if undated is not None:
+            issue = {"code": "missing_source_time", "event_id": undated, "purchase_id": candidate.purchase_id}
+            if issue not in issues:
+                issues.append(issue)
             continue
-        issue = {"code": "missing_source_time", "event_id": undated, "purchase_id": candidate.purchase_id}
-        if issue not in issues:
-            issues.append(issue)
-    return kept, issues, not_number
+        if (
+            facts is not None
+            and candidate.field in GROUNDED_FIELDS
+            and not is_grounded(candidate, facts, drafted, events)
+        ):
+            ungrounded += 1
+            continue
+        kept.append(candidate)
+    return kept, issues, not_number, ungrounded
 
 
 def token_quotes(operations: list[dict], events: dict[str, dict], pattern: re.Pattern) -> list[tuple[dict, str]]:
@@ -628,24 +733,29 @@ def llm_step(args: dict, prompt_text: str, response: dict | None, started: float
 
 
 class LlmSystem:
-    """B1 и S1: одно извлечение на кусок; у S1 перед ним ограниченная развилка с инструментами."""
+    """B1, S1 и S1.2: одно извлечение на кусок; у S1 перед ним развилка с инструментами у модели, у S1.2 - у кода."""
 
-    def __init__(self, name: str, use_tools: bool, client: OllamaClient | None = None) -> None:
+    def __init__(
+        self, name: str, use_tools: bool, client: OllamaClient | None = None, code_routing: bool = False
+    ) -> None:
         self.name = name
         self.use_tools = use_tools
+        self.code_routing = code_routing
         self.client = client or OllamaClient()
         self.session = Session()
 
     def describe(self) -> dict:
         """Модель с digest, параметры генерации, тексты и хэши промптов и схем для meta.json."""
         used = ["extract", "answer", "retry", *(["tools", "final"] if self.use_tools else [])]
+        if self.code_routing:
+            used.append("hybrid")
         prompts = {name: PROMPTS[name] for name in used}
         schemas = {"extraction": Extraction.model_json_schema(), "answer": QueryAnswer.model_json_schema()}
         if self.use_tools:
             schemas["tools"] = TOOL_SCHEMAS
         return {
             "system": self.name,
-            "system_version": SYSTEM_VERSION,
+            "system_version": HYBRID_VERSION if self.code_routing else SYSTEM_VERSION,
             "model": MODEL,
             "model_digest": self.client.model_digest(MODEL),
             "temperature": TEMPERATURE,
@@ -675,18 +785,21 @@ class LlmSystem:
         """Кусок -> предложения по завершенным источникам, черновик и вопросы закупщику."""
         session = self.session_for(context)
         search = self.use_tools and needs_search(context.events)
-        fixed = estimate_tokens(PROMPTS["extract"])
+        hints = route_chunk(context, session, tools) if self.code_routing else None
+        instruction = PROMPTS["extract"] + (f"\n\n{PROMPTS['hybrid']}" if hints is not None else "")
+        fixed = estimate_tokens(instruction)
         if search:
             fixed += estimate_tokens(PROMPTS["tools"] + PROMPTS["final"] + json.dumps(TOOL_SCHEMAS, ensure_ascii=False))
-        request, stats = episode_request(context, session, fixed)
+        request, stats = episode_request(context, session, fixed, hints)
+        hint_steps = [] if hints is None else [hints.step]
         if stats["over_budget"]:
             # Ollama молча обрезал бы начало промпта вместе с инструкцией: кусок нужно нарезать мельче
-            return self.overflow(context, session, tools, [], stats)
+            return self.overflow(context, session, tools, hint_steps, stats)
         messages = [
-            {"role": "system", "content": PROMPTS["extract"]},
+            {"role": "system", "content": instruction},
             {"role": "user", "content": json.dumps(request, ensure_ascii=False)},
         ]
-        branch = Branch(messages=messages, steps=[])
+        branch = Branch(messages=messages, steps=hint_steps, failed_tool=None if hints is None else hints.failed_tool)
         if search:
             branch = self.search(messages, tools, stats)
             if branch.stop_reason is not None:
@@ -701,7 +814,7 @@ class LlmSystem:
         steps = branch.steps + steps
         if reply is None:
             return self.fail(context, session, tools, steps, stop_reason, branch.failed_tool)
-        return self.assemble(context, session, tools, reply, steps, branch.failed_tool)
+        return self.assemble(context, session, tools, reply, steps, branch.failed_tool, hints)
 
     def answer_query(self, context: EpisodeContext, query: dict, tools: ModelTools) -> SystemOutput:
         """Вопрос закупщика -> ответ кодом, если он сводится к сводке, полям или задачам карточки, иначе модели."""
@@ -864,12 +977,22 @@ class LlmSystem:
         reply: Extraction,
         steps: list[TraceStep],
         failed_tool: dict | None,
+        hints: CodeHints | None = None,
     ) -> SystemOutput:
         """Ответ модели -> проверенные кандидаты, сведение по источникам и предложения."""
         events = {event["id"]: event for event in context.seen_events}
         cards = context.crm_state["purchases"]
         candidates, tasks, dropped = read_extraction(reply, events)
-        candidates, issues, not_number = check_grounding(candidates, events)
+        sources = {source_of(event) for event in context.events}
+        drafted = tuple(candidate for source in sources for candidate in session.drafts.get(source, []))
+        facts = None if hints is None else hints.facts
+        candidates, issues, not_number, ungrounded = check_grounding(candidates, events, facts, drafted)
+        links = (
+            session.links if hints is None else {**session.links, **{link["event_id"]: link for link in hints.links}}
+        )
+        if hints is not None:
+            candidates, ambiguous_issues = hold_ambiguous(candidates, links)
+            issues += ambiguous_issues
         candidates, authority_issues = gate_authority(candidates, events, context.authority_registry, cards)
         issues += authority_issues
         if failed_tool is not None:
@@ -895,27 +1018,42 @@ class LlmSystem:
         ]
         ready_tasks += [task for source in closing for task in session.held_tasks.get(source, [])]
         proposals = build_proposals([*operations, *ready_tasks], context, self.name)
+        if hints is not None:
+            proposals = mark_links(proposals, links, events)
         issues += merged.issues
         issues += [issue for source in closing for issue in session.draft_issues.get(source, [])]
+        # Вопрос о том же сообщении код уже задал с кандидатами: повтор от модели закупщику не нужен
+        asked = {(issue["code"], issue.get("event_id")) for issue in issues}
         issues += [
-            issue.model_dump(exclude_none=True) for issue in reply.issues if keeps_issue(issue, proposals, context)
+            issue.model_dump(exclude_none=True)
+            for issue in reply.issues
+            if keeps_issue(issue, proposals, context) and (issue.code, issue.event_id) not in asked
         ]
         issues = [{**issue, "after": context.episode_id} for issue in issues]
         if not tools.closed:
             remember(session, context, merged, draft_new, tasks, open_sources, closing, proposals)
             ask_again(session, issues, context)
+            session.links = links
+        result = {
+            "dropped_without_quote": dropped,
+            "dropped_not_number": not_number,
+            "final": [[*key, candidate.value, candidate.status] for key, candidate in merged.final.items()],
+            "pending": [[*candidate.key, candidate.value, candidate.status] for candidate in merged.pending],
+            "drafts": {source: len(items) for source, items in session.drafts.items()},
+        }
+        if hints is not None:
+            missed = missed_facts(hints.facts, reply)
+            result.update(
+                dropped_ungrounded=ungrounded,
+                missed_candidate=len(missed),
+                missed=[[fact.event_id, fact.field, fact.value] for fact in missed],
+            )
         steps.append(
             TraceStep(
                 kind="system",
                 name="merge",
                 args={"open_sources": sorted(open_sources), "closing_sources": sorted(closing)},
-                result={
-                    "dropped_without_quote": dropped,
-                    "dropped_not_number": not_number,
-                    "final": [[*key, candidate.value, candidate.status] for key, candidate in merged.final.items()],
-                    "pending": [[*candidate.key, candidate.value, candidate.status] for candidate in merged.pending],
-                    "drafts": {source: len(items) for source, items in session.drafts.items()},
-                },
+                result=result,
             )
         )
         if failed_tool is not None:
@@ -1070,3 +1208,222 @@ def likely_purchase(text: str, cards: dict) -> str | None:
     best = max(scores.values(), default=0)
     leaders = [pid for pid, score in scores.items() if score == best]
     return leaders[0] if best > 0 and len(leaders) == 1 else None
+
+
+def search_query(text: str, cards: dict) -> str:
+    """Слова события, совпавшие со словами поставщика, товара или объекта карточек -> запрос find_purchase.
+
+    В S1 запрос писала модель, и 4B ставила в него фразы ("перенос на 20 ноября"), которые
+    ничего не находили. Пустой запрос значит, что искать нечего.
+    """
+    card_words = {
+        word
+        for card in cards.values()
+        for name in DESCRIPTIVE_FIELDS
+        for word in words(str(card["fields"].get(name) or ""))
+    }
+    matched = [word for word in words(text) if any(same_stem(word, card_word) for card_word in card_words)]
+    return " ".join(dict.fromkeys(matched))
+
+
+def story_purchases(context: EpisodeContext, session: Session) -> set[str]:
+    """Закупки истории: названные в поступивших сообщениях и уже предложенные по прошлым кускам."""
+    named = mentioned_purchases([event["text"] for event in context.seen_events], context.crm_state["purchases"])
+    return named | {purchase_id for purchase_id, _ in session.committed}
+
+
+def run_calls(calls: list[tuple[str, str]], tools: ModelTools) -> tuple[dict[tuple[str, str], ToolResult], dict | None]:
+    """Вызовы инструментов кода по порядку, пока есть бюджет и не было сбоя -> результаты и сбой.
+
+    Вызов сверх бюджета код не делает, а пишет в шаг route пропущенным: отказ харнесса
+    по лимиту остановил бы весь кусок, хотя модель может привязать сообщение по карточкам.
+    """
+    handlers = {"find_purchase": tools.find_purchase, "read_evidence": tools.read_evidence}
+    results, failed_tool = {}, None
+    for name, argument in dict.fromkeys(calls):
+        if failed_tool is not None or tools.tool_calls_left == 0:
+            break
+        result = handlers[name](argument)
+        results[(name, argument)] = result
+        if not result.ok and result.error.code in TOOL_FAILURE_ISSUES:
+            purchase_id = argument if name == "read_evidence" else None
+            failed_tool = {"code": result.error.code, "name": name, "purchase_id": purchase_id}
+    return results, failed_tool
+
+
+def link_entry(event_id: str, query: str, result: ToolResult | None, pool: set[str]) -> dict | None:
+    """Итог поиска по сообщению без номера -> привязка для модели или None, если привязывает модель.
+
+    Поиск ничего не нашел или искать нечего, а в истории (без нее - в CRM) одна закупка:
+    код привязывает к ней и помечает привязку inferred, чтобы закупщик увидел ее в диффе.
+    Сбой поиска или пропуск по бюджету привязки не дают: после сбоя изменения держит
+    hold_unlinked, после пропуска привязывает модель по карточкам.
+    """
+    if result is not None and result.ok:
+        return {"event_id": event_id, "purchase_id": result.data["candidates"][0]["purchase_id"]}
+    if result is not None and result.error.code == "ambiguous":
+        return {"event_id": event_id, "purchase_id": None, "candidates": result.error.details["candidates"]}
+    nothing_found = not query or (result is not None and result.error.code == "not_found")
+    if nothing_found and len(pool) == 1:
+        return {"event_id": event_id, "purchase_id": next(iter(pool)), "inferred": True}
+    return None
+
+
+def route_chunk(context: EpisodeContext, session: Session, tools: ModelTools) -> CodeHints:
+    """Кусок -> привязка сообщений без номера, прежние сообщения по ссылкам и факты правил; инструменты зовет код.
+
+    4B на развилке S1 писала в find_purchase фразы вместо товара и поставщика, а на ссылку
+    "как договаривались" при номере в тексте звала поиск вместо read_evidence. Здесь сообщение
+    с номером не ищется, запрос собирается из слов карточек, а прежние сообщения читаются сразу.
+    """
+    cards = context.crm_state["purchases"]
+    unnamed = {
+        event["id"]: search_query(event["text"], cards)
+        for event in context.events
+        if not PURCHASE_ID.search(event["text"])
+    }
+    searches = [("find_purchase", query) for query in unnamed.values() if query]
+    found, failed_tool = run_calls(searches, tools)
+    pool = story_purchases(context, session) or set(cards)
+    links = [
+        link
+        for event_id, query in unnamed.items()
+        if (link := link_entry(event_id, query, found.get(("find_purchase", query)), pool)) is not None
+    ]
+    linked = {link["event_id"]: link["purchase_id"] for link in links if link["purchase_id"]}
+    readings = [
+        ("read_evidence", purchase_id)
+        for event in context.events
+        if PRIOR_REFERENCE.search(event["text"])
+        for purchase_id in PURCHASE_ID.findall(event["text"]) or [linked.get(event["id"])]
+        if purchase_id is not None
+    ]
+    read = {}
+    if failed_tool is None:
+        read, failed_tool = run_calls(readings, tools)
+    earlier = earlier_fragments(list(read.values()), context.events)
+    facts = text_facts(context.events)
+    calls = {**found, **read}
+    step = TraceStep(
+        kind="system",
+        name="route",
+        args={"pool": sorted(pool)},
+        result={
+            "links": links,
+            "calls": [[*call, None if result.ok else result.error.code] for call, result in calls.items()],
+            "skipped": [list(call) for call in dict.fromkeys([*searches, *readings]) if call not in calls],
+            "earlier": [fragment["event_id"] for fragment in earlier],
+            "facts": len(facts),
+        },
+    )
+    return CodeHints(links=links, earlier=earlier, facts=facts, step=step, failed_tool=failed_tool)
+
+
+def earlier_fragments(results: list[ToolResult], events: list[dict]) -> list[dict]:
+    """Ответы read_evidence -> прежние сообщения без повторов; сообщения куска модель уже видит в events."""
+    chunk_ids = {event["id"] for event in events}
+    fragments = [
+        fragment
+        for result in results
+        if result.ok
+        for fragment in result.data["fragments"]
+        if fragment["event_id"] not in chunk_ids
+    ]
+    return list({fragment["event_id"]: fragment for fragment in fragments}.values())
+
+
+def text_facts(events: list[dict]) -> list[TextFact]:
+    """Кусок -> факты правил B0 по сообщениям, включая фразы с оговорками, без валюты и единицы.
+
+    Это подсказка, а не решение: предложение это или договоренность и к какой закупке, решает модель.
+    """
+    facts = []
+    for event in events:
+        text = event["text"]
+        found, _ = find_facts(text, find_tasks(text), event.get("occurred_at"), keep_conditional=True)
+        for _, field_name, value, start, end in found:
+            if field_name in DERIVED_FIELDS:
+                continue
+            clause = next(clause.group(0) for clause in iter_clauses(text) if clause.start() <= start < clause.end())
+            agreed = AGREED_RE.search(clause) is not None and CONDITIONAL_RE.search(clause) is None
+            fact = TextFact(event["id"], field_name, value, text[start:end].strip(), agreed)
+            if all((known.event_id, known.field, known.value) != (fact.event_id, fact.field, value) for known in facts):
+                facts.append(fact)
+    return facts
+
+
+def missed_facts(facts: list[TextFact], reply: Extraction) -> list[TextFact]:
+    """Факты явной договоренности, которых нет в ответе модели с цитатой из того же сообщения.
+
+    Код их не добавляет: модель могла верно счесть факт предложением. Счетчик нужен для разбора.
+    """
+    given = [
+        (quote.event_id, change.value)
+        for change in reply.changes
+        if isinstance(change, SetField)
+        for quote in change.evidence
+    ]
+    return [
+        fact
+        for fact in facts
+        if fact.agreed
+        and not any(event_id == fact.event_id and same_value(value, fact.value) for event_id, value in given)
+    ]
+
+
+def hold_ambiguous(candidates: list[Candidate], links: dict[str, dict]) -> tuple[list[Candidate], list[dict]]:
+    """Изменения сообщений, для которых поиск нашел несколько карточек, не предлагаются.
+
+    hybrid.md велит модели не создавать по ним операций, но 4B может взять одну из карточек.
+    Код неоднозначность уже знает: закупщик получает вопрос с кандидатами, как в B0.
+    """
+    ambiguous = {event_id: link["candidates"] for event_id, link in links.items() if link["purchase_id"] is None}
+    kept, issues = [], []
+    for candidate in candidates:
+        if not all(quote["event_id"] in ambiguous for quote in candidate.evidence):
+            kept.append(candidate)
+            continue
+        issue = {
+            "code": "ambiguous_purchase",
+            "event_id": candidate.event_id,
+            "candidates": ambiguous[candidate.event_id],
+        }
+        if issue not in issues:
+            issues.append(issue)
+    return kept, issues
+
+
+def link_label(operation: dict, purchase_id: str, links: dict[str, dict], events: dict[str, dict]) -> str | None:
+    """Пометка привязки операции: None - закупку подтвердил номер в тексте или поиск.
+
+    inferred - код взял единственную закупку истории; model - закупку выбрала модель по карточкам:
+    поиск пропущен по бюджету, искать было нечего при нескольких закупках или поиск нашел другую.
+    """
+    labels = set()
+    for quote in operation["evidence"]:
+        if PURCHASE_ID.search(events[quote["event_id"]]["text"]):
+            return None
+        link = links.get(quote["event_id"], {})
+        if link.get("purchase_id") != purchase_id:
+            labels.add("model")
+        elif link.get("inferred"):
+            labels.add("inferred")
+        else:
+            return None
+    return "model" if "model" in labels else "inferred"
+
+
+def mark_links(proposals: list[dict], links: dict[str, dict], events: dict[str, dict]) -> list[dict]:
+    """Операции, привязку которых не подтвердил ни номер в тексте, ни поиск, получают пометку link.
+
+    Закупщик видит пометку в диффе и проверяет закупку.
+    """
+    marked = []
+    for proposal in proposals:
+        purchase_id = next(iter(proposal["based_on"]))
+        operations = []
+        for operation in proposal["operations"]:
+            label = link_label(operation, purchase_id, links, events)
+            operations.append(operation if label is None else {**operation, "link": label})
+        marked.append({**proposal, "operations": operations})
+    return marked

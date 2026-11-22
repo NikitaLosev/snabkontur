@@ -1,8 +1,9 @@
 """Системы, которые раннер сравнивает на одном наборе и одном контракте.
 
 rules - B0 на правилах, llm_single (B1) - одно извлечение моделью Ollama на кусок,
-agent (S1) - то же извлечение с ограниченной развилкой инструментов только для чтения.
-B1 и S1 идут одним путем кода и отличаются только инструментами.
+agent (S1) - то же извлечение с ограниченной развилкой инструментов только для чтения,
+hybrid (S1.2) - развилку решает код, а модель получает его привязку и кандидатов фактов правил.
+B1, S1 и S1.2 идут одним путем кода и отличаются только инструментами и подсказками.
 """
 
 from functools import partial
@@ -33,6 +34,7 @@ SYSTEMS = {
     "rules": RuleSystem,
     "llm_single": partial(LlmSystem, "llm_single", use_tools=False),
     "agent": partial(LlmSystem, "agent", use_tools=True),
+    "hybrid": partial(LlmSystem, "hybrid", use_tools=False, code_routing=True),
 }
 
 

@@ -117,6 +117,12 @@ def agent(replies: list) -> tuple[LlmSystem, FakeClient]:
     return LlmSystem("agent", use_tools=True, client=client), client
 
 
+def hybrid(replies: list) -> tuple[LlmSystem, FakeClient]:
+    """S1.2 на поддельном клиенте: инструменты вызывает код."""
+    client = FakeClient(replies)
+    return LlmSystem("hybrid", use_tools=False, client=client, code_routing=True), client
+
+
 def test_reply_becomes_one_proposal_per_purchase() -> None:
     system, _ = single([json.dumps(VALID)])
 
@@ -737,13 +743,334 @@ def test_unrelated_authorized_quote_does_not_pass_unknown_speaker_value(amount: 
     ]
 
 
-@pytest.mark.parametrize("name", ["llm_single", "agent"])
-def test_describe_records_model_prompts_and_schemas(name: str) -> None:
+@pytest.mark.parametrize(
+    ("name", "version", "extra_prompts"),
+    [("llm_single", "s1.1", set()), ("agent", "s1.1", {"tools", "final"}), ("hybrid", "s1.2", {"hybrid"})],
+)
+def test_describe_records_model_prompts_and_schemas(name: str, version: str, extra_prompts: set) -> None:
     system = build_system(name)
     system.client = FakeClient([])
 
     meta = system.describe()
 
-    assert (meta["system"], meta["system_version"], meta["model_digest"]) == (name, "s1.1", "sha256:fake")
-    expected = {"extract", "answer", "retry"} | ({"tools", "final"} if name == "agent" else set())
+    assert (meta["system"], meta["system_version"], meta["model_digest"]) == (name, version, "sha256:fake")
+    expected = {"extract", "answer", "retry"} | extra_prompts
     assert set(meta["prompt_hashes"]) == set(meta["prompts"]) == expected
+
+
+EMPTY_REPLY = json.dumps({"changes": [], "issues": []})
+
+
+def cards_state(*cards: tuple[str, str, str]) -> dict:
+    """CRM из карточек (ID, поставщик, товар)."""
+    purchases = {
+        pid: {"revision": 1, "fields": {"supplier": supplier, "title": title}} for pid, supplier, title in cards
+    }
+    return {"purchases": purchases, "tasks": {}}
+
+
+TWO_SUPPLIERS = cards_state(("P-1", "Атлас", "Ремни"), ("P-2", "Вектор", "Сальники"))
+
+
+def route_step(output: SystemOutput) -> dict:
+    """Результат шага route из трейса системы."""
+    return next(step.result for step in output.trace_steps if step.name == "route")
+
+
+def merge_step(output: SystemOutput) -> dict:
+    """Результат шага merge из трейса системы."""
+    return next(step.result for step in output.trace_steps if step.name == "merge")
+
+
+def test_hybrid_skips_search_when_every_event_names_purchase() -> None:
+    system, client = hybrid([json.dumps({"changes": [BUDGET_CHANGE], "issues": []})])
+    tools = make_tools()
+
+    output = system.process_episode(make_context([EVENT]), tools)
+
+    assert tools.tracer.records == []
+    assert len(client.payloads) == 1 and "tools" not in client.payloads[0]
+    assert client.request(0)["links"] == []
+    assert [op["value"] for proposal in output.proposals for op in proposal["operations"]] == ["4000000.00"]
+
+
+@pytest.mark.parametrize(
+    ("state", "text", "calls", "links"),
+    [
+        # Запрос - слова события, совпавшие с поставщиком и товаром, а не фраза модели
+        (
+            STATE,
+            UNLINKED["text"],
+            [("find_purchase", {"query": "ремням атласа"})],
+            [{"event_id": "e3", "purchase_id": "P-1"}],
+        ),
+        (
+            cards_state(("P-1", "Атлас", "Ремни"), ("P-2", "Атлас", "Ремни")),
+            UNLINKED["text"],
+            [("find_purchase", {"query": "ремням атласа"})],
+            [{"event_id": "e3", "purchase_id": None, "candidates": ["P-1", "P-2"]}],
+        ),
+        # Слов карточек нет: искать нечего, единственная закупка CRM дает выведенную привязку
+        (
+            STATE,
+            "Склад подтвердил 22 ноября 2026 года.",
+            [],
+            [{"event_id": "e3", "purchase_id": "P-1", "inferred": True}],
+        ),
+        (TWO_SUPPLIERS, "Склад подтвердил 22 ноября 2026 года.", [], []),
+    ],
+)
+def test_hybrid_links_unnamed_event_by_code(state: dict, text: str, calls: list, links: list) -> None:
+    system, client = hybrid([EMPTY_REPLY])
+    tools = make_tools(state)
+
+    system.process_episode(make_context([{"id": "e3", "text": text}], state=state), tools)
+
+    assert [(record["name"], record["args"]) for record in tools.tracer.records] == calls
+    assert client.request(0)["links"] == links
+
+
+def test_hybrid_reads_evidence_for_prior_reference_without_search() -> None:
+    letter = {"id": "e0", "text": "По P-1 цена 1200 рублей за штуку."}
+    reference = {"id": "e1", "text": "По P-1 цена как договаривались в старом письме."}
+    system, client = hybrid([EMPTY_REPLY])
+    tools = make_tools()
+    tools.add_sources([letter, reference])
+
+    system.process_episode(make_context([reference], seen=[letter]), tools)
+
+    assert [(record["name"], record["args"]) for record in tools.tracer.records] == [
+        ("read_evidence", {"purchase_id": "P-1", "period": None})
+    ]
+    # Само сообщение куска модель уже видит в events
+    assert client.request(0)["earlier"] == [{"event_id": "e0", "quote": letter["text"]}]
+
+
+@pytest.mark.parametrize(
+    ("text", "link"),
+    [
+        # Поиск подтвердил закупку: пометки нет
+        ("По ремням у Атласа дату согласовали на 22 ноября 2026 года.", None),
+        # Искать нечего, а в истории названа одна закупка: привязка выведена кодом
+        ("Склад подтвердил 22 ноября 2026 года.", "inferred"),
+        # Поиск нашел P-2, а модель взяла P-1: привязку выбрала модель
+        ("По сальникам у Вектора дату согласовали на 22 ноября 2026 года.", "model"),
+    ],
+)
+def test_hybrid_marks_inferred_link_in_diff(text: str, link: str | None) -> None:
+    story = {"id": "e1", "text": "По P-1 счёт пришёл."}
+    event = {"id": "e4", "text": text}
+    reply = {"changes": [change("delivery_date", "2026-11-22", event, "22 ноября 2026 года")], "issues": []}
+    system, _ = hybrid([json.dumps(reply)])
+
+    output = system.process_episode(make_context([event], seen=[story], state=TWO_SUPPLIERS), make_tools(TWO_SUPPLIERS))
+
+    assert [op.get("link") for proposal in output.proposals for op in proposal["operations"]] == [link]
+
+
+def test_hybrid_keeps_inferred_mark_when_meeting_closes_in_later_chunk() -> None:
+    story = {"id": "e1", "text": "По P-1 счёт пришёл."}
+    meeting = {"source_id": "meet", "occurred_at": "2026-11-03T10:15:00+03:00", "source_complete": False}
+    first = {**meeting, "id": "m1", "chunk_index": 1, "text": "Склад подтвердил 22 ноября 2026 года."}
+    last = {**meeting, "id": "m2", "chunk_index": 2, "text": "На этом всё.", "source_complete": True}
+    reply = {"changes": [change("delivery_date", "2026-11-22", first, "22 ноября 2026 года")], "issues": []}
+    system, _ = hybrid([json.dumps(reply), EMPTY_REPLY])
+    tools = make_tools(TWO_SUPPLIERS)
+    system.process_episode(make_context([first], seen=[story], state=TWO_SUPPLIERS), tools)
+
+    final = system.process_episode(
+        make_context([last], seen=[story, first], episode="step2", state=TWO_SUPPLIERS), make_tools(TWO_SUPPLIERS)
+    )
+
+    # Привязку m1 код вывел в прошлом куске: пометка доходит до предложения при закрытии записи
+    assert [(op["field"], op.get("link")) for op in final.proposals[0]["operations"]] == [("delivery_date", "inferred")]
+
+
+def test_hybrid_holds_change_of_ambiguous_event_and_asks() -> None:
+    state = cards_state(("P-1", "Атлас", "Ремни"), ("P-2", "Атлас", "Ремни"))
+    # Модель не послушалась hybrid.md и взяла P-1 из двух подходящих карточек, а вопрос задала без кандидатов
+    reply = {**json.loads(DATE_REPLY), "issues": [{"code": "ambiguous_purchase", "event_id": "e3"}]}
+    system, _ = hybrid([json.dumps(reply)])
+
+    output = system.process_episode(make_context([UNLINKED], state=state), make_tools(state))
+
+    assert output.proposals == []
+    assert output.issues == [
+        {"code": "ambiguous_purchase", "event_id": "e3", "candidates": ["P-1", "P-2"], "after": "step1"}
+    ]
+
+
+def test_hybrid_infers_link_from_purchase_proposed_earlier_in_story() -> None:
+    follow_up = {"id": "e4", "text": "Склад тоже подтвердил."}
+    system, client = hybrid([DATE_REPLY, EMPTY_REPLY])
+    system.process_episode(make_context([UNLINKED], state=TWO_SUPPLIERS), make_tools(TWO_SUPPLIERS))
+
+    # Номера нет ни в одном сообщении: закупку истории дает предложение прошлого куска
+    system.process_episode(
+        make_context([follow_up], seen=[UNLINKED], episode="step2", state=TWO_SUPPLIERS), make_tools(TWO_SUPPLIERS)
+    )
+
+    assert client.request(1)["links"] == [{"event_id": "e4", "purchase_id": "P-1", "inferred": True}]
+
+
+def test_hybrid_gives_text_candidates_and_counts_missed_agreed_ones() -> None:
+    event = {
+        "id": "e1",
+        "text": "По P-1 согласовали 8 штук по 125 рублей. Подтвердим по 120 рублей, если оплатим вперёд.",
+    }
+    system, client = hybrid([EMPTY_REPLY])
+
+    output = system.process_episode(make_context([event], state=BARE), make_tools(BARE))
+
+    # Валюту и единицу выводит код: в подсказках их нет; условная цена тоже подсказка
+    assert client.request(0)["candidates"] == [
+        {"event_id": "e1", "field": "unit_price", "value": "125.00", "quote": "по 125 рублей"},
+        {"event_id": "e1", "field": "quantity", "value": 8, "quote": "8 штук"},
+        {"event_id": "e1", "field": "unit_price", "value": "120.00", "quote": "по 120 рублей"},
+    ]
+    # Пропущенные договоренности код не добавляет, только считает; условная цена не в счете
+    assert output.proposals == []
+    assert (merge_step(output)["missed_candidate"], merge_step(output)["missed"]) == (
+        2,
+        [["e1", "unit_price", "125.00"], ["e1", "quantity", 8]],
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "field", "value", "quote", "kept"),
+    [
+        ("hybrid", "По P-1 берём 8 штук по 125 рублей.", "unit_price", "130.00", "по 125 рублей", False),
+        ("hybrid", "По P-1 берём 8 штук по 125 рублей.", "unit_price", "125.00", "по 125 рублей", True),
+        # B1 числа с текстом не сверяет
+        ("llm_single", "По P-1 берём 8 штук по 125 рублей.", "unit_price", "130.00", "по 125 рублей", True),
+        (
+            "hybrid",
+            "По P-1 поставку согласовали на 22 ноября 2026 года.",
+            "delivery_date",
+            "2026-11-23",
+            "22 ноября 2026 года",
+            False,
+        ),
+        # Правила цену без "по" и "за штуку" не берут, но число есть в сообщении
+        ("hybrid", "По P-1 теперь 900 рублей.", "unit_price", "900.00", "теперь 900 рублей", True),
+        # Без слова о поставке правила дату не берут, но она дословно в цитате
+        (
+            "hybrid",
+            "По P-1 крайний день 22 ноября 2026 года.",
+            "delivery_date",
+            "2026-11-22",
+            "22 ноября 2026 года",
+            True,
+        ),
+        # Число словами правила не разбирают: код его не проверяет
+        ("hybrid", "По P-1 берём восемь штук.", "quantity", 8, "восемь штук", True),
+        # Слово "одну" или "тысяч" рядом с цифрами сверку не выключает: 130 и 13000 в тексте нет
+        (
+            "hybrid",
+            "По P-1 берём 8 штук по 125 рублей за одну штуку.",
+            "unit_price",
+            "130.00",
+            "по 125 рублей за одну штуку",
+            False,
+        ),
+        ("hybrid", "По P-1 берём по 12 тысяч рублей.", "unit_price", "13000.00", "по 12 тысяч рублей", False),
+        ("hybrid", "По P-1 берём по 12 тысяч рублей.", "unit_price", "12000.00", "по 12 тысяч рублей", True),
+    ],
+)
+def test_hybrid_keeps_only_numbers_found_in_text(
+    name: str, text: str, field: str, value: object, quote: str, kept: bool
+) -> None:
+    event = {"id": "e1", "text": text}
+    reply = {"changes": [change(field, value, event, quote)], "issues": []}
+    client = FakeClient([json.dumps(reply)])
+    system = LlmSystem(name, use_tools=False, client=client, code_routing=name == "hybrid")
+
+    output = system.process_episode(make_context([event], state=BARE), make_tools(BARE))
+
+    values = [op["value"] for proposal in output.proposals for op in proposal["operations"] if op["field"] == field]
+    assert values == ([value] if kept else [])
+
+
+def test_hybrid_number_from_neighbour_message_of_chunk_is_grounded() -> None:
+    price = {"id": "e1", "text": "По P-1 берём по 125 рублей."}
+    invoice = {"id": "e2", "text": "По P-1 счёт подходит."}
+    reply = {"changes": [change("unit_price", "125.00", invoice, "счёт подходит")], "issues": []}
+    system, _ = hybrid([json.dumps(reply)])
+
+    output = system.process_episode(make_context([price, invoice], state=BARE), make_tools(BARE))
+
+    assert [op["value"] for op in output.proposals[0]["operations"] if op["field"] == "unit_price"] == ["125.00"]
+    assert merge_step(output)["dropped_ungrounded"] == 0
+
+
+def test_hybrid_meeting_acceptance_without_number_is_grounded_by_draft() -> None:
+    offer = {**OFFER_CHUNK, "occurred_at": "2026-11-03T10:15:00+03:00", "chunk_index": 2}
+    accept = {
+        "id": "m8",
+        "source_id": "meet",
+        "occurred_at": "2026-11-03T11:10:00+03:00",
+        "chunk_index": 8,
+        "text": "По P-1 на этом сошлись.",
+    }
+    state = {
+        "purchases": {"P-1": {"revision": 1, "fields": {"unit_price": "13000.00", "prepayment_percent": 0}}},
+        "tasks": {},
+    }
+    first = {
+        "changes": [
+            change("unit_price", "12000.00", offer, "по 12000 рублей", "conditional"),
+            change("prepayment_percent", 100, offer, "при полной предоплате", "conditional"),
+        ],
+        "issues": [],
+    }
+    second = {"changes": [change("unit_price", "12000.00", accept, "на этом сошлись")], "issues": []}
+    system, _ = hybrid([json.dumps(first), json.dumps(second)])
+    chunk = {**offer, "source_complete": False}
+    system.process_episode(make_context([chunk], episode="step3", state=state), make_tools(state))
+
+    final = system.process_episode(
+        make_context([{**accept, "source_complete": True}], seen=[offer], episode="step4", state=state),
+        make_tools(state),
+    )
+
+    assert [(op["field"], op["value"]) for op in final.proposals[0]["operations"]] == [
+        ("prepayment_percent", 100),
+        ("unit_price", "12000.00"),
+    ]
+
+
+def test_hybrid_find_timeout_holds_unlinked_change() -> None:
+    fault = [{"at": "step1", "operation": "find_purchase", "fault": "timeout", "once": True}]
+    system, client = hybrid([DATE_REPLY])
+    tools = make_tools(faults=fault)
+
+    output = system.process_episode(make_context([UNLINKED]), tools)
+
+    assert [(record["name"], record["error"]) for record in tools.tracer.records] == [("find_purchase", "timeout")]
+    assert len(client.payloads) == 1
+    assert output.proposals == []
+    assert output.stop_reason == StopReason.TOOL_ERROR
+    assert output.issues == [{"code": "tool_timeout", "event_id": "e3", "purchase_id": "P-1", "after": "step1"}]
+
+
+def test_hybrid_does_not_call_tools_over_budget() -> None:
+    state = cards_state(("P-1", "Атлас", "Ремни"), ("P-2", "Вектор", "Сальники"), ("P-3", "Орбита", "Клапаны"))
+    events = [
+        {"id": f"e{index}", "text": f"{item} приедут завтра."}
+        for index, item in enumerate(["Ремни", "Сальники", "Клапаны"])
+    ]
+    valves = change("prepayment_percent", 100, events[2], "Клапаны приедут завтра")
+    system, _ = hybrid([json.dumps({"changes": [{**valves, "purchase_id": "P-3"}], "issues": []})])
+    tools = make_tools(state)
+
+    output = system.process_episode(make_context(events, state=state), tools)
+
+    # Лимит два вызова: третий поиск код не делает и пишет пропущенным, а не получает отказ харнесса
+    assert [(record["args"]["query"], record["error"]) for record in tools.tracer.records] == [
+        ("ремни", None),
+        ("сальники", None),
+    ]
+    assert route_step(output)["skipped"] == [["find_purchase", "клапаны"]]
+    assert output.stop_reason == StopReason.DONE
+    # Поиск не подтвердил P-3: привязку модели закупщик видит в диффе
+    assert [(op["purchase_id"], op.get("link")) for op in output.proposals[0]["operations"]] == [("P-3", "model")]

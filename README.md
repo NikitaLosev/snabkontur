@@ -36,4 +36,6 @@ python -m snab.run --system rules --split dev --category workflow --out runs/rul
 
 Системы: `rules` - B0 на регулярных выражениях, `llm_single` - одно извлечение `qwen3:4b-instruct-2507-q4_K_M` в локальном Ollama на эпизод. Для `llm_single` нужен запущенный Ollama с этой моделью
 
+`hybrid` (S1.2) - извлечение `llm_single`, но поиск закупки, привязку и чтение прежних сообщений делает код, а модель получает кандидатов фактов из правил B0; сравнение с S1: `make eval SYSTEM=hybrid` и `make eval SYSTEM=agent`
+
 В папке прогона: `predictions.jsonl` в формате набора, `trace.jsonl` с шагами, `meta.json` с версиями, хэшами кода и промптов, `summary.json` со временем, вызовами и стоимостью, `eval-report.json` от `eval/score.py --judge off`. Кейс, до инъекции сбоя которого система не дошла, отмечен в отчете как `unsupported`. В git хранится только эталонный прогон `runs/kt3-ref`. Test без флага `--i-know-this-is-heldout` не запускается
