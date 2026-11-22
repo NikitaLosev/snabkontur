@@ -1,0 +1,18 @@
+[project]
+name = "snabkontur"
+version = "0.1.0"
+# sqlite3.connect(autocommit=...), datetime.UTC и StrEnum
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+include = ["snab/**/*.py", "tests/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "Q", "B", "UP"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+# langsmith из зависимостей судьи регистрирует свой плагин pytest; тестам он не нужен
+addopts = "-p no:langsmith_plugin"

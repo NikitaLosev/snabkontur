@@ -19,3 +19,21 @@
 - [`design-doc/`](design-doc/README.md) - дизайн-документ: контракт, бюджеты, схема, память, eval, риски
 - [`eval/`](eval/README.md) - наборы и методика оценки
 - [`TODO.md`](TODO.md) - задачи и контрольные точки
+
+## Запуск харнесса
+
+Нужен Python 3.12 или новее
+
+```bash
+make venv                             # .venv с requirements.txt и requirements-dev.txt
+make lint                             # ruff check и ruff format --check
+make test                             # CRM, инструменты, системы, golden replay и смоук раннера
+make baseline                         # B0 на правилах по всему dev, эталонный прогон runs/kt3-ref
+make eval SYSTEM=llm_single SPLIT=dev # любая система из snab/systems тем же раннером
+make scenarios SYSTEM=rules REPEAT=3  # многошаговые сценарии КТ-3 с повторами
+python -m snab.run --system rules --split dev --category workflow --out runs/rules-workflow
+```
+
+Системы: `rules` - B0 на регулярных выражениях, `llm_single` - одно извлечение `qwen3:4b-instruct-2507-q4_K_M` в локальном Ollama на эпизод. Для `llm_single` нужен запущенный Ollama с этой моделью
+
+В папке прогона: `predictions.jsonl` в формате набора, `trace.jsonl` с шагами, `meta.json` с версиями, хэшами кода и промптов, `summary.json` со временем, вызовами и стоимостью, `eval-report.json` от `eval/score.py --judge off`. Кейс, до инъекции сбоя которого система не дошла, отмечен в отчете как `unsupported`. В git хранится только эталонный прогон `runs/kt3-ref`. Test без флага `--i-know-this-is-heldout` не запускается

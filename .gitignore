@@ -269,3 +269,10 @@ tmp/
 # Generated evaluation outputs; datasets and annotations stay versioned
 eval-report*.json
 eval/.score-selfcheck.json
+
+# Runner outputs; only the reference run is versioned
+/runs/*
+!/runs/kt3-ref/
+!/runs/kt3-ref/eval-report*.json
+# A subset run copies the selected gold next to predictions; it must not be versioned
+/runs/kt3-ref/gold-selection.jsonl

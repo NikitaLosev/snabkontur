@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Замер времени закупщика</title>
+<style>
+  :root { --fg: #1d1d1f; --muted: #6b6b70; --line: #d8d8dc; --bg: #ffffff; --panel: #f5f5f7; --accent: #0a5cd5; --bad: #b3261e; --ok: #1b7f3b; }
+  body { font: 15px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); margin: 0; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 8px 0 16px; }
+  h2 { font-size: 17px; margin: 20px 0 8px; }
+  .muted { color: var(--muted); }
+  .panel { background: var(--panel); border-radius: 8px; padding: 12px 14px; margin: 8px 0; }
+  button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; min-width: 0; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 13px; }
+  td input { width: 100%; box-sizing: border-box; }
+  .event { border-left: 3px solid var(--accent); padding: 6px 10px; margin: 6px 0; background: #fff; }
+  .event .meta { font-size: 12px; color: var(--muted); }
+  .bar { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--line); padding: 8px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; z-index: 1; }
+  .timer { font-variant-numeric: tabular-nums; font-size: 18px; margin-right: auto; }
+  .case-list button { display: block; width: 100%; text-align: left; margin: 6px 0; }
+  .done { color: var(--ok); }
+  .error { color: var(--bad); }
+  .rejected input { text-decoration: line-through; color: var(--muted); }
+  .hidden { display: none; }
+  .pause-cover { padding: 40px; text-align: center; font-size: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Замер времени закупщика</h1>
+
+  <section id="login">
+    <p>Введите имя. Под одним именем каждый кейс проходится один раз; режим кейса назначается автоматически.</p>
+    <input id="participant" placeholder="Имя участника" autocomplete="off">
+    <button class="primary" id="login-button">Показать кейсы</button>
+    <p id="login-error" class="error"></p>
+  </section>
+
+  <section id="cases" class="hidden">
+    <p>Участник: <b id="participant-name"></b> · <a href="#" id="logout">сменить</a></p>
+    <div class="case-list" id="case-list"></div>
+  </section>
+
+  <section id="case" class="hidden">
+    <div class="bar">
+      <span class="timer" id="timer">00:00</span>
+      <button class="primary" id="start">Начать</button>
+      <button id="pause" disabled>Пауза</button>
+      <button class="primary" id="finish" disabled>Готово</button>
+      <button id="back">К списку</button>
+    </div>
+    <h2 id="case-title"></h2>
+    <p id="mode-help" class="muted"></p>
+    <p id="case-error" class="error"></p>
+    <div id="pause-cover" class="panel pause-cover hidden">Пауза. Время не идёт. Нажмите «Продолжить».</div>
+    <div id="work" class="hidden">
+      <h2>Источники</h2>
+      <div id="events"></div>
+      <h2>Текущие задачи</h2>
+      <div id="tasks"></div>
+      <div id="manual" class="hidden">
+        <h2>Карточки закупок</h2>
+        <p class="muted">Измените поля, которые меняет источник. Даты: ГГГГ-ММ-ДД или ДД.ММ.ГГГГ. Пустое поле означает «нет значения».</p>
+        <div id="manual-cards"></div>
+        <h2>Новые поля</h2>
+        <table><thead><tr><th>Закупка</th><th>Поле</th><th>Значение</th><th></th></tr></thead><tbody id="manual-extra"></tbody></table>
+        <button id="manual-add-field">Добавить поле</button>
+      </div>
+      <div id="review" class="hidden">
+        <h2>Карточки закупок до изменений</h2>
+        <div id="review-cards"></div>
+        <h2>Изменения, предложенные системой</h2>
+        <p id="no-proposal" class="panel hidden">Система ничего не предложила по этому кейсу. Если изменения нужны, добавьте их сами.</p>
+        <table><thead><tr><th>Решение</th><th>Закупка</th><th>Поле</th><th>Значение</th><th></th></tr></thead><tbody id="review-rows"></tbody></table>
+        <button id="review-add-field">Добавить поле</button>
+      </div>
+      <h2>Новые задачи</h2>
+      <table><thead><tr><th class="decision-col hidden">Решение</th><th>Закупка</th><th>Название</th><th>Ответственный</th><th>Срок</th><th></th></tr></thead><tbody id="task-rows"></tbody></table>
+      <button id="add-task">Добавить задачу</button>
+    </div>
+  </section>
+</main>
+<script>
+"use strict";
+const LABELS = {
+  title: "Название", supplier: "Поставщик", quantity: "Количество", unit: "Единица", unit_price: "Цена за единицу",
+  currency: "Валюта", total_amount: "Сумма", vat_rate: "Ставка НДС, %", price_includes_vat: "Цена с НДС (да/нет)",
+  delivery_date: "Срок поставки", shipment_date: "Дата отгрузки", budget: "Бюджет", prepayment_percent: "Предоплата, %",
+  delivery_cost: "Стоимость доставки", delivered_quantity: "Поставлено", remaining_quantity: "Осталось поставить",
+  status: "Статус", payment_terms: "Условия оплаты",
+};
+const MODE_HELP = {
+  manual: "Ручной ввод: прочитайте источники и сами внесите изменения в карточку и задачи.",
+  review: "Проверка: по каждой строке системы решите «принять» или «отклонить», при необходимости исправьте значение, добавьте пропущенное.",
+};
+const MODE_NAMES = { manual: "ручной ввод", review: "проверка диффа" };
+const $ = (id) => document.getElementById(id);
+const state = { participant: "", view: null, startedAt: null, pauses: [], pausedAt: null, tick: null, running: false };
+
+function show(id, visible) { $(id).classList.toggle("hidden", !visible); }
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "text") node.textContent = value;
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+    else node.setAttribute(key, value);
+  }
+  for (const child of children) node.append(child);
+  return node;
+}
+
+function displayValue(value) {
+  if (value === null || value === undefined) return "";
+  if (value === true) return "да";
+  if (value === false) return "нет";
+  return String(value);
+}
+
+function fieldLabel(field) { return LABELS[field] ? `${LABELS[field]} (${field})` : field; }
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || response.statusText);
+  return body;
+}
+
+async function login() {
+  const name = $("participant").value.trim();
+  if (!name) { $("login-error").textContent = "Введите имя"; return; }
+  state.participant = name;
+  try {
+    await loadCases();
+    $("login-error").textContent = "";
+  } catch (error) { $("login-error").textContent = error.message; }
+}
+
+async function loadCases() {
+  const body = await api(`/api/cases?participant=${encodeURIComponent(state.participant)}`);
+  $("participant-name").textContent = state.participant;
+  const list = $("case-list");
+  list.replaceChildren();
+  body.cases.forEach((item, index) => {
+    const label = `Кейс ${index + 1} · ${MODE_NAMES[item.mode]}`;
+    const button = el("button", { text: item.done ? `${label} · сдан` : label, onclick: () => openCase(item.case_id, index) });
+    if (item.done) { button.disabled = true; button.classList.add("done"); }
+    list.append(button);
+  });
+  show("login", false); show("case", false); show("cases", true);
+}
+
+async function openCase(caseId, index) {
+  const view = await api(`/api/case?participant=${encodeURIComponent(state.participant)}&id=${encodeURIComponent(caseId)}`);
+  Object.assign(state, { view, startedAt: null, pauses: [], pausedAt: null, running: false });
+  $("case-title").textContent = `Кейс ${index + 1} · ${MODE_NAMES[view.mode]}`;
+  $("mode-help").textContent = MODE_HELP[view.mode] + " Текст и форма откроются после «Начать».";
+  $("case-error").textContent = "";
+  $("timer").textContent = "00:00";
+  $("start").disabled = false; $("pause").disabled = true; $("finish").disabled = true;
+  $("pause").textContent = "Пауза";
+  renderCase(view);
+  show("work", false); show("pause-cover", false); show("cases", false); show("case", true);
+}
+
+function renderCase(view) {
+  $("events").replaceChildren(...view.events.map(renderEvent));
+  $("tasks").replaceChildren(renderTasks(view.initial_state.tasks));
+  for (const id of ["task-rows", "review-rows", "manual-extra"]) $(id).replaceChildren();
+  const review = view.mode === "review";
+  show("manual", !review); show("review", review);
+  document.querySelectorAll(".decision-col").forEach((node) => node.classList.toggle("hidden", !review));
+  if (review) renderReview(view); else renderManual(view);
+}
+
+function renderEvent(event) {
+  const meta = [event.occurred_at, event.author, event.modality, event.media_time].filter(Boolean).join(" · ");
+  return el("div", { class: "event" }, [el("div", { class: "meta", text: meta }), el("div", { text: event.text })]);
+}
+
+function renderTasks(tasks) {
+  const rows = Object.values(tasks);
+  if (!rows.length) return el("p", { class: "muted", text: "Задач нет" });
+  return el("table", {}, [
+    el("tr", {}, ["Закупка", "Название", "Ответственный", "Срок", "Статус"].map((text) => el("th", { text }))),
+    ...rows.map((task) => el("tr", {}, [task.purchase_id, task.title, task.owner, task.due_date, task.status].map((value) => el("td", { text: displayValue(value) })))),
+  ]);
+}
+
+function purchaseIds() { return Object.keys(state.view.initial_state.purchases); }
+
+function purchaseSelect(selected) {
+  const select = el("select", { "data-key": "purchase_id" }, purchaseIds().map((id) => el("option", { value: id, text: id })));
+  if (selected && !purchaseIds().includes(selected)) select.append(el("option", { value: selected, text: selected }));
+  if (selected) select.value = selected;
+  return select;
+}
+
+function renderManual(view) {
+  const blocks = Object.entries(view.initial_state.purchases).map(([purchaseId, card]) => el("div", { class: "panel" }, [
+    el("b", { text: `${purchaseId} · ревизия ${card.revision}` }),
+    el("table", {}, Object.entries(card.fields).map(([field, value]) => el("tr", {}, [
+      el("td", { text: fieldLabel(field) }),
+      el("td", {}, [el("input", { "data-purchase": purchaseId, "data-field": field, "data-initial": displayValue(value), value: displayValue(value) })]),
+    ]))),
+  ]));
+  $("manual-cards").replaceChildren(...blocks);
+}
+
+function renderCards(purchases) {
+  return Object.entries(purchases).map(([purchaseId, card]) => el("div", { class: "panel" }, [
+    el("b", { text: `${purchaseId} · ревизия ${card.revision}` }),
+    el("table", {}, Object.entries(card.fields).map(([field, value]) => el("tr", {}, [el("td", { text: fieldLabel(field) }), el("td", { text: displayValue(value) || "—" })]))),
+  ]));
+}
+
+function renderReview(view) {
+  $("review-cards").replaceChildren(...renderCards(view.initial_state.purchases));
+  show("no-proposal", !view.has_proposal);
+  for (const op of view.proposed_operations) {
+    if (op.op === "set_field") $("review-rows").append(fieldRow(op, "system"));
+    else $("task-rows").append(taskRow(op.task, "system"));
+  }
+}
+
+function decisionCell(row) {
+  const name = `decision-${Math.random().toString(36).slice(2)}`;
+  const radio = (value, text) => el("label", {}, [el("input", { type: "radio", name, value, onchange: () => row.classList.toggle("rejected", value === "reject") }), ` ${text} `]);
+  return el("td", {}, [radio("accept", "принять"), radio("reject", "отклонить")]);
+}
+
+function removeCell(row) { return el("td", {}, [el("button", { text: "✕", title: "Убрать строку", onclick: () => row.remove() })]); }
+
+function fieldRow(op, source) {
+  const row = el("tr", { "data-source": source, "data-kind": "set_field" });
+  const inputs = [
+    el("td", {}, [purchaseSelect(op.purchase_id)]),
+    el("td", {}, [el("input", { "data-key": "field", value: op.field || "", placeholder: "например, delivery_date", list: "field-names" })]),
+    el("td", {}, [el("input", { "data-key": "value", value: displayValue(op.value) })]),
+  ];
+  if (state.view.mode === "review") row.append(source === "system" ? decisionCell(row) : el("td", { class: "muted", text: "добавлено" }));
+  row.append(...inputs, source === "system" ? el("td") : removeCell(row));
+  rememberInitial(row);
+  return row;
+}
+
+function taskRow(task, source) {
+  const row = el("tr", { "data-source": source, "data-kind": "create_task" });
+  if (state.view.mode === "review") row.append(source === "system" ? decisionCell(row) : el("td", { class: "muted", text: "добавлено" }));
+  row.append(
+    el("td", {}, [purchaseSelect(task.purchase_id)]),
+    el("td", {}, [el("input", { "data-key": "title", value: displayValue(task.title) })]),
+    el("td", {}, [el("input", { "data-key": "owner", value: displayValue(task.owner) })]),
+    el("td", {}, [el("input", { "data-key": "due_date", value: displayValue(task.due_date), placeholder: "ГГГГ-ММ-ДД" })]),
+    source === "system" ? el("td") : removeCell(row),
+  );
+  rememberInitial(row);
+  return row;
+}
+
+function rememberInitial(row) { row.dataset.initial = JSON.stringify(rowValues(row)); }
+
+function rowValues(row) {
+  const values = {};
+  row.querySelectorAll("[data-key]").forEach((node) => { values[node.dataset.key] = node.value; });
+  return values;
+}
+
+function rowDecision(row) {
+  if (row.dataset.source === "added") return "accept";
+  const checked = row.querySelector("input[type=radio]:checked");
+  return checked ? checked.value : null;
+}
+
+function rowOperation(row) {
+  const values = rowValues(row);
+  if (row.dataset.kind === "set_field") return { op: "set_field", purchase_id: values.purchase_id, field: values.field.trim(), value: values.value };
+  return { op: "create_task", task: values };
+}
+
+function isBlankAdded(row) {
+  if (row.dataset.source !== "added") return false;
+  const { purchase_id: _, ...values } = rowValues(row);
+  return Object.values(values).every((value) => !value.trim());
+}
+
+function manualOperations() {
+  const operations = [];
+  document.querySelectorAll("#manual-cards input").forEach((input) => {
+    if (input.value.trim() !== input.dataset.initial) operations.push({ op: "set_field", purchase_id: input.dataset.purchase, field: input.dataset.field, value: input.value });
+  });
+  document.querySelectorAll("#manual-extra tr, #task-rows tr").forEach((row) => { if (!isBlankAdded(row)) operations.push(rowOperation(row)); });
+  return operations;
+}
+
+function reviewRows() {
+  return [...document.querySelectorAll("#review-rows tr, #task-rows tr")].filter((row) => !isBlankAdded(row)).map((row) => ({
+    row, source: row.dataset.source, decision: rowDecision(row), edited: row.dataset.initial !== JSON.stringify(rowValues(row)),
+  }));
+}
+
+function addFieldRow() {
+  const target = state.view.mode === "review" ? "review-rows" : "manual-extra";
+  $(target).append(fieldRow({ purchase_id: purchaseIds()[0], field: "", value: "" }, "added"));
+}
+
+function addTaskRow() { $("task-rows").append(taskRow({ purchase_id: purchaseIds()[0] }, "added")); }
+
+function nowIso() { return new Date().toISOString(); }
+
+function activeMs() {
+  if (!state.startedAt) return 0;
+  const end = state.pausedAt ? Date.parse(state.pausedAt) : Date.now();
+  const paused = state.pauses.reduce((sum, p) => sum + Date.parse(p.resumed_at) - Date.parse(p.paused_at), 0);
+  return end - Date.parse(state.startedAt) - paused;
+}
+
+function renderTimer() {
+  const seconds = Math.floor(activeMs() / 1000);
+  $("timer").textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function start() {
+  state.startedAt = nowIso();
+  state.running = true;
+  state.tick = setInterval(renderTimer, 250);
+  $("start").disabled = true; $("pause").disabled = false; $("finish").disabled = false;
+  show("work", true);
+}
+
+function togglePause() {
+  if (state.pausedAt) {
+    state.pauses.push({ paused_at: state.pausedAt, resumed_at: nowIso() });
+    state.pausedAt = null;
+    $("pause").textContent = "Пауза"; $("finish").disabled = false;
+  } else {
+    state.pausedAt = nowIso();
+    $("pause").textContent = "Продолжить"; $("finish").disabled = true;
+  }
+  show("work", !state.pausedAt); show("pause-cover", Boolean(state.pausedAt));
+  renderTimer();
+}
+
+async function finish() {
+  const finishedAt = nowIso();
+  const review = state.view.mode === "review";
+  const rows = review ? reviewRows() : [];
+  if (rows.some((row) => row.decision === null)) { $("case-error").textContent = "Примите или отклоните каждую строку системы"; return; }
+  const operations = review ? rows.filter((row) => row.decision === "accept").map((row) => rowOperation(row.row)) : manualOperations();
+  const payload = {
+    participant: state.participant, case_id: state.view.case_id, started_at: state.startedAt, finished_at: finishedAt,
+    pauses: state.pauses, operations,
+    review_rows: rows.map(({ source, decision, edited }) => ({ source, decision, edited })),
+  };
+  $("finish").disabled = true;
+  try {
+    await api("/result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  } catch (error) {
+    $("case-error").textContent = `Не сохранилось: ${error.message}`;
+    $("finish").disabled = false;
+    return;
+  }
+  stopTimer();
+  await loadCases();
+}
+
+function stopTimer() { clearInterval(state.tick); state.running = false; }
+
+function back() {
+  if (state.running && !confirm("Замер не сохранится. Вернуться к списку?")) return;
+  stopTimer();
+  loadCases();
+}
+
+$("login-button").addEventListener("click", login);
+$("participant").addEventListener("keydown", (event) => { if (event.key === "Enter") login(); });
+$("logout").addEventListener("click", (event) => { event.preventDefault(); show("cases", false); show("login", true); });
+$("start").addEventListener("click", start);
+$("pause").addEventListener("click", togglePause);
+$("finish").addEventListener("click", finish);
+$("back").addEventListener("click", back);
+$("manual-add-field").addEventListener("click", addFieldRow);
+$("review-add-field").addEventListener("click", addFieldRow);
+$("add-task").addEventListener("click", addTaskRow);
+window.addEventListener("beforeunload", (event) => { if (state.running) event.preventDefault(); });
+document.body.append(el("datalist", { id: "field-names" }, Object.keys(LABELS).map((value) => el("option", { value, label: LABELS[value] }))));
+</script>
+</body>
+</html>
