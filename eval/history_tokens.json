@@ -1,0 +1,126 @@
+{
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "method": "ollama /api/generate raw, prompt_eval_count",
+  "histories": [
+    {
+      "id": "M01",
+      "exact_tokens": 6095,
+      "lower_bound": null,
+      "exceeds_8192": false
+    },
+    {
+      "id": "D-MEM-01",
+      "exact_tokens": 23077,
+      "lower_bound": 9024,
+      "exceeds_8192": true
+    },
+    {
+      "id": "D-MEM-02",
+      "exact_tokens": 23695,
+      "lower_bound": 9408,
+      "exceeds_8192": true
+    },
+    {
+      "id": "D-MEM-03",
+      "exact_tokens": 3119,
+      "lower_bound": 1241,
+      "exceeds_8192": false
+    },
+    {
+      "id": "D-MEM-04",
+      "exact_tokens": 4023,
+      "lower_bound": 1623,
+      "exceeds_8192": false
+    },
+    {
+      "id": "D-MEM-05",
+      "exact_tokens": 3091,
+      "lower_bound": 1234,
+      "exceeds_8192": false
+    },
+    {
+      "id": "D-MEM-06",
+      "exact_tokens": 4055,
+      "lower_bound": 1620,
+      "exceeds_8192": false
+    },
+    {
+      "id": "D-MEM-07",
+      "exact_tokens": 3118,
+      "lower_bound": 1248,
+      "exceeds_8192": false
+    },
+    {
+      "id": "D-MEM-08",
+      "exact_tokens": 4075,
+      "lower_bound": 1620,
+      "exceeds_8192": false
+    },
+    {
+      "id": "D-MEM-09",
+      "exact_tokens": 3120,
+      "lower_bound": 1241,
+      "exceeds_8192": false
+    },
+    {
+      "id": "T-MEM-01",
+      "exact_tokens": 25108,
+      "lower_bound": 9760,
+      "exceeds_8192": true
+    },
+    {
+      "id": "T-MEM-02",
+      "exact_tokens": 26311,
+      "lower_bound": 10267,
+      "exceeds_8192": true
+    },
+    {
+      "id": "T-MEM-03",
+      "exact_tokens": 3371,
+      "lower_bound": 1357,
+      "exceeds_8192": false
+    },
+    {
+      "id": "T-MEM-04",
+      "exact_tokens": 4405,
+      "lower_bound": 1763,
+      "exceeds_8192": false
+    },
+    {
+      "id": "T-MEM-05",
+      "exact_tokens": 3174,
+      "lower_bound": 1271,
+      "exceeds_8192": false
+    },
+    {
+      "id": "T-MEM-06",
+      "exact_tokens": 4192,
+      "lower_bound": 1685,
+      "exceeds_8192": false
+    },
+    {
+      "id": "T-MEM-07",
+      "exact_tokens": 3417,
+      "lower_bound": 1351,
+      "exceeds_8192": false
+    },
+    {
+      "id": "T-MEM-08",
+      "exact_tokens": 4373,
+      "lower_bound": 1763,
+      "exceeds_8192": false
+    },
+    {
+      "id": "T-MEM-09",
+      "exact_tokens": 3355,
+      "lower_bound": 1358,
+      "exceeds_8192": false
+    },
+    {
+      "id": "T-MEM-10",
+      "exact_tokens": 4336,
+      "lower_bound": 1769,
+      "exceeds_8192": false
+    }
+  ]
+}

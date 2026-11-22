@@ -1,0 +1,2046 @@
+{
+  "report_version": "1.0",
+  "judge_prompt_version": "snabkontur-judge-2",
+  "packages": {
+    "pydantic": "2.14.4",
+    "langchain-openai": "1.8.5",
+    "langchain-core": "1.8.4",
+    "openai": "3.57.0"
+  },
+  "files": {
+    "gold_sha256": "f2bec2f69fb67e33b1d19ac10fcdd4b1802e9ae545185ebb3c50f68b31c47874",
+    "predictions_sha256": "ffd7537fe910ba1dbb4450781a5a143923ee28f8512e884e91993f93ab79dcfd"
+  },
+  "coverage": {
+    "reference_cases": 7,
+    "provided_cases": 7,
+    "missing_cases": [],
+    "unknown_cases": [],
+    "invalid_lines": []
+  },
+  "selection": {
+    "limit": null,
+    "reference_file_cases": 7,
+    "selected_ids": [
+      "D-WOR-01",
+      "D-WOR-04",
+      "D-WOR-06",
+      "D-WOR-07",
+      "D-WOR-14",
+      "D-WOR-16",
+      "D-WOR-17"
+    ],
+    "ignored_prediction_cases": 0
+  },
+  "metrics": {
+    "diff_precision": {
+      "numerator": 8,
+      "denominator": 9,
+      "value": 0.8888888888888888,
+      "pending": 0,
+      "status": "critical",
+      "target": 0.95,
+      "critical_below": 0.9
+    },
+    "diff_recall": {
+      "numerator": 8,
+      "denominator": 12,
+      "value": 0.6666666666666666,
+      "pending": 0,
+      "status": "critical",
+      "target": 0.85,
+      "critical_below": 0.75
+    },
+    "dossier_precision": {
+      "numerator": 556,
+      "denominator": 572,
+      "value": 0.972027972027972,
+      "pending": 0,
+      "status": "ok",
+      "target": 0.95,
+      "critical_below": 0.9
+    },
+    "dossier_recall": {
+      "numerator": 556,
+      "denominator": 572,
+      "value": 0.972027972027972,
+      "pending": 0,
+      "status": "ok",
+      "target": 0.85,
+      "critical_below": 0.75
+    },
+    "conflict_recall": {
+      "numerator": 0,
+      "denominator": 0,
+      "value": null,
+      "pending": 0,
+      "status": "not_applicable",
+      "target": 0.9,
+      "critical_below": 0.8
+    },
+    "summary_precision": {
+      "numerator": 0,
+      "denominator": 0,
+      "value": null,
+      "pending": 0,
+      "status": "not_applicable",
+      "target": 0.95,
+      "critical_below": 0.9
+    },
+    "summary_recall": {
+      "numerator": 0,
+      "denominator": 0,
+      "value": null,
+      "pending": 0,
+      "status": "not_applicable",
+      "target": 0.95,
+      "critical_below": 0.9
+    },
+    "format_validity": {
+      "numerator": 52,
+      "denominator": 52,
+      "value": 1.0,
+      "pending": 0,
+      "status": "ok",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "crm_chains": {
+      "numerator": 3,
+      "denominator": 7,
+      "value": 0.42857142857142855,
+      "pending": 0,
+      "status": "critical",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "literal_citations": {
+      "numerator": 9,
+      "denominator": 9,
+      "value": 1.0,
+      "pending": 0,
+      "status": "ok",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "supported_citations": {
+      "numerator": 8,
+      "denominator": 9,
+      "value": null,
+      "pending": 1,
+      "status": "incomplete",
+      "target": 1.0,
+      "critical_below": 1.0,
+      "conservative_lower_bound": 0.8888888888888888
+    },
+    "calculation_accuracy": {
+      "numerator": 330,
+      "denominator": 333,
+      "value": 0.990990990990991,
+      "pending": 0,
+      "status": "critical",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "purchase_link_accuracy": {
+      "numerator": 8,
+      "denominator": 9,
+      "value": 0.8888888888888888,
+      "pending": 0,
+      "status": "critical",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "answers_accuracy": {
+      "numerator": 5,
+      "denominator": 7,
+      "value": 0.7142857142857143,
+      "pending": 0,
+      "status": "ok",
+      "target": null,
+      "critical_below": null
+    },
+    "arithmetic_consistency": {
+      "numerator": 52,
+      "denominator": 52,
+      "value": 1.0,
+      "pending": 0,
+      "status": "ok",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "crm_checkpoints": {
+      "numerator": 36,
+      "denominator": 52,
+      "value": 0.6923076923076923,
+      "pending": 0,
+      "status": "critical",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "summary_window_accuracy": {
+      "numerator": 0,
+      "denominator": 0,
+      "value": null,
+      "pending": 0,
+      "status": "not_applicable",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "case_schema_validity": {
+      "numerator": 7,
+      "denominator": 7,
+      "value": 1.0,
+      "pending": 0,
+      "status": "ok",
+      "target": 1.0,
+      "critical_below": 1.0
+    },
+    "counts": {
+      "missing_cases": 0,
+      "diff_tp": 8,
+      "diff_fp": 1,
+      "diff_fn": 4,
+      "extra_issues": 2,
+      "missing_issues": 2,
+      "dossier_tp": 556,
+      "dossier_fp": 16,
+      "dossier_fn": 16,
+      "extra_answers": 0,
+      "duplicate_answers": 0,
+      "stale_current_record_facts": 16,
+      "refuted_current_record_facts": 0,
+      "stale_current_answers": 0,
+      "refuted_current_answers": 0
+    },
+    "pending_checks": {
+      "event_reapplication_requires_execution_trace": 7,
+      "refuted_current_record_facts": 16,
+      "stale_current_answers": 2,
+      "refuted_current_answers": 2
+    }
+  },
+  "groups": {
+    "workflow": {
+      "diff_precision": {
+        "numerator": 8,
+        "denominator": 9,
+        "value": 0.8888888888888888,
+        "pending": 0,
+        "status": "critical",
+        "target": 0.95,
+        "critical_below": 0.9
+      },
+      "diff_recall": {
+        "numerator": 8,
+        "denominator": 12,
+        "value": 0.6666666666666666,
+        "pending": 0,
+        "status": "critical",
+        "target": 0.85,
+        "critical_below": 0.75
+      },
+      "dossier_precision": {
+        "numerator": 556,
+        "denominator": 572,
+        "value": 0.972027972027972,
+        "pending": 0,
+        "status": "ok",
+        "target": 0.95,
+        "critical_below": 0.9
+      },
+      "dossier_recall": {
+        "numerator": 556,
+        "denominator": 572,
+        "value": 0.972027972027972,
+        "pending": 0,
+        "status": "ok",
+        "target": 0.85,
+        "critical_below": 0.75
+      },
+      "conflict_recall": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null,
+        "pending": 0,
+        "status": "not_applicable",
+        "target": 0.9,
+        "critical_below": 0.8
+      },
+      "summary_precision": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null,
+        "pending": 0,
+        "status": "not_applicable",
+        "target": 0.95,
+        "critical_below": 0.9
+      },
+      "summary_recall": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null,
+        "pending": 0,
+        "status": "not_applicable",
+        "target": 0.95,
+        "critical_below": 0.9
+      },
+      "format_validity": {
+        "numerator": 52,
+        "denominator": 52,
+        "value": 1.0,
+        "pending": 0,
+        "status": "ok",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "crm_chains": {
+        "numerator": 3,
+        "denominator": 7,
+        "value": 0.42857142857142855,
+        "pending": 0,
+        "status": "critical",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "literal_citations": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1.0,
+        "pending": 0,
+        "status": "ok",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "supported_citations": {
+        "numerator": 8,
+        "denominator": 9,
+        "value": null,
+        "pending": 1,
+        "status": "incomplete",
+        "target": 1.0,
+        "critical_below": 1.0,
+        "conservative_lower_bound": 0.8888888888888888
+      },
+      "calculation_accuracy": {
+        "numerator": 330,
+        "denominator": 333,
+        "value": 0.990990990990991,
+        "pending": 0,
+        "status": "critical",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "purchase_link_accuracy": {
+        "numerator": 8,
+        "denominator": 9,
+        "value": 0.8888888888888888,
+        "pending": 0,
+        "status": "critical",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "answers_accuracy": {
+        "numerator": 5,
+        "denominator": 7,
+        "value": 0.7142857142857143,
+        "pending": 0,
+        "status": "ok",
+        "target": null,
+        "critical_below": null
+      },
+      "arithmetic_consistency": {
+        "numerator": 52,
+        "denominator": 52,
+        "value": 1.0,
+        "pending": 0,
+        "status": "ok",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "crm_checkpoints": {
+        "numerator": 36,
+        "denominator": 52,
+        "value": 0.6923076923076923,
+        "pending": 0,
+        "status": "critical",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "summary_window_accuracy": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null,
+        "pending": 0,
+        "status": "not_applicable",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "case_schema_validity": {
+        "numerator": 7,
+        "denominator": 7,
+        "value": 1.0,
+        "pending": 0,
+        "status": "ok",
+        "target": 1.0,
+        "critical_below": 1.0
+      },
+      "counts": {
+        "missing_cases": 0,
+        "diff_tp": 8,
+        "diff_fp": 1,
+        "diff_fn": 4,
+        "extra_issues": 2,
+        "missing_issues": 2,
+        "dossier_tp": 556,
+        "dossier_fp": 16,
+        "dossier_fn": 16,
+        "extra_answers": 0,
+        "duplicate_answers": 0,
+        "stale_current_record_facts": 16,
+        "refuted_current_record_facts": 0,
+        "stale_current_answers": 0,
+        "refuted_current_answers": 0
+      },
+      "pending_checks": {
+        "event_reapplication_requires_execution_trace": 7,
+        "refuted_current_record_facts": 16,
+        "stale_current_answers": 2,
+        "refuted_current_answers": 2
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "D-WOR-01",
+      "category": "workflow",
+      "metrics": {
+        "diff_precision": {
+          "numerator": 3,
+          "denominator": 3,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "diff_recall": {
+          "numerator": 3,
+          "denominator": 3,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "dossier_precision": {
+          "numerator": 77,
+          "denominator": 77,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "dossier_recall": {
+          "numerator": 77,
+          "denominator": 77,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "conflict_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.9,
+          "critical_below": 0.8
+        },
+        "summary_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "summary_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "format_validity": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_chains": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "literal_citations": {
+          "numerator": 3,
+          "denominator": 3,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "supported_citations": {
+          "numerator": 3,
+          "denominator": 3,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "calculation_accuracy": {
+          "numerator": 45,
+          "denominator": 45,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "purchase_link_accuracy": {
+          "numerator": 3,
+          "denominator": 3,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "answers_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": null,
+          "critical_below": null
+        },
+        "arithmetic_consistency": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_checkpoints": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "summary_window_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "case_schema_validity": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "counts": {
+          "missing_cases": 0,
+          "diff_tp": 3,
+          "diff_fp": 0,
+          "diff_fn": 0,
+          "extra_issues": 0,
+          "missing_issues": 0,
+          "dossier_tp": 77,
+          "dossier_fp": 0,
+          "dossier_fn": 0,
+          "extra_answers": 0,
+          "duplicate_answers": 0
+        },
+        "pending_checks": {
+          "event_reapplication_requires_execution_trace": 1
+        }
+      },
+      "details": [],
+      "fully_matches_structured_gold": true,
+      "unsupported": false
+    },
+    {
+      "id": "D-WOR-04",
+      "category": "workflow",
+      "metrics": {
+        "diff_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "diff_recall": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "dossier_precision": {
+          "numerator": 83,
+          "denominator": 88,
+          "value": 0.9431818181818182,
+          "pending": 0,
+          "status": "below_target",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "dossier_recall": {
+          "numerator": 83,
+          "denominator": 88,
+          "value": 0.9431818181818182,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "conflict_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.9,
+          "critical_below": 0.8
+        },
+        "summary_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "summary_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "format_validity": {
+          "numerator": 8,
+          "denominator": 8,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_chains": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "literal_citations": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "supported_citations": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "calculation_accuracy": {
+          "numerator": 51,
+          "denominator": 51,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "purchase_link_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "answers_accuracy": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "ok",
+          "target": null,
+          "critical_below": null
+        },
+        "arithmetic_consistency": {
+          "numerator": 8,
+          "denominator": 8,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_checkpoints": {
+          "numerator": 3,
+          "denominator": 8,
+          "value": 0.375,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "summary_window_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "case_schema_validity": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "counts": {
+          "missing_cases": 0,
+          "diff_tp": 0,
+          "diff_fp": 0,
+          "diff_fn": 1,
+          "extra_issues": 0,
+          "missing_issues": 0,
+          "dossier_tp": 83,
+          "dossier_fp": 5,
+          "dossier_fn": 5,
+          "stale_current_record_facts": 5,
+          "refuted_current_record_facts": 0,
+          "stale_current_answers": 0,
+          "refuted_current_answers": 0,
+          "extra_answers": 0,
+          "duplicate_answers": 0
+        },
+        "pending_checks": {
+          "refuted_current_record_facts": 5,
+          "stale_current_answers": 1,
+          "refuted_current_answers": 1,
+          "event_reapplication_requires_execution_trace": 1
+        }
+      },
+      "details": [
+        {
+          "type": "missing_fact",
+          "fact": {
+            "phase": "D-WOR-04-step3",
+            "evidence": [
+              {
+                "event_id": "D-WOR-04-e3",
+                "quote": "Договорились на 24 ноября 2026 года."
+              }
+            ],
+            "proposal_id": "D-WOR-04-p1",
+            "based_on": {
+              "P-D704": 1
+            },
+            "kind": "field",
+            "purchase": "P-D704",
+            "field": "delivery_date",
+            "value": "2026-11-24"
+          }
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-04-a1"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-04-step4"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-04-a2"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-04-step5"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-04-a3"
+        },
+        {
+          "type": "answer_mismatch",
+          "query_id": "D-WOR-04-a3",
+          "expected": {
+            "unit_price": "13000.00",
+            "currency": "RUB",
+            "quantity": 10,
+            "delivered_quantity": 0,
+            "delivery_date": "2026-11-24"
+          },
+          "actual": {
+            "unit_price": "13000.00",
+            "currency": "RUB",
+            "quantity": 10,
+            "delivered_quantity": 0,
+            "delivery_date": "2026-11-15"
+          }
+        }
+      ],
+      "fully_matches_structured_gold": false,
+      "unsupported": false
+    },
+    {
+      "id": "D-WOR-06",
+      "category": "workflow",
+      "metrics": {
+        "diff_precision": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "diff_recall": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "dossier_precision": {
+          "numerator": 88,
+          "denominator": 88,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "dossier_recall": {
+          "numerator": 88,
+          "denominator": 88,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "conflict_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.9,
+          "critical_below": 0.8
+        },
+        "summary_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "summary_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "format_validity": {
+          "numerator": 8,
+          "denominator": 8,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_chains": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "literal_citations": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "supported_citations": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "calculation_accuracy": {
+          "numerator": 51,
+          "denominator": 51,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "purchase_link_accuracy": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "answers_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": null,
+          "critical_below": null
+        },
+        "arithmetic_consistency": {
+          "numerator": 8,
+          "denominator": 8,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_checkpoints": {
+          "numerator": 8,
+          "denominator": 8,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "summary_window_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "case_schema_validity": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "counts": {
+          "missing_cases": 0,
+          "diff_tp": 2,
+          "diff_fp": 0,
+          "diff_fn": 0,
+          "extra_issues": 0,
+          "missing_issues": 0,
+          "dossier_tp": 88,
+          "dossier_fp": 0,
+          "dossier_fn": 0,
+          "extra_answers": 0,
+          "duplicate_answers": 0
+        },
+        "pending_checks": {
+          "event_reapplication_requires_execution_trace": 1
+        }
+      },
+      "details": [],
+      "fully_matches_structured_gold": true,
+      "unsupported": false
+    },
+    {
+      "id": "D-WOR-07",
+      "category": "workflow",
+      "metrics": {
+        "diff_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "diff_recall": {
+          "numerator": 1,
+          "denominator": 2,
+          "value": 0.5,
+          "pending": 0,
+          "status": "critical",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "dossier_precision": {
+          "numerator": 83,
+          "denominator": 88,
+          "value": 0.9431818181818182,
+          "pending": 0,
+          "status": "below_target",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "dossier_recall": {
+          "numerator": 83,
+          "denominator": 88,
+          "value": 0.9431818181818182,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "conflict_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.9,
+          "critical_below": 0.8
+        },
+        "summary_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "summary_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "format_validity": {
+          "numerator": 8,
+          "denominator": 8,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_chains": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "literal_citations": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "supported_citations": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "calculation_accuracy": {
+          "numerator": 51,
+          "denominator": 51,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "purchase_link_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "answers_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": null,
+          "critical_below": null
+        },
+        "arithmetic_consistency": {
+          "numerator": 8,
+          "denominator": 8,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_checkpoints": {
+          "numerator": 3,
+          "denominator": 8,
+          "value": 0.375,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "summary_window_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "case_schema_validity": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "counts": {
+          "missing_cases": 0,
+          "diff_tp": 1,
+          "diff_fp": 0,
+          "diff_fn": 1,
+          "extra_issues": 0,
+          "missing_issues": 0,
+          "dossier_tp": 83,
+          "dossier_fp": 5,
+          "dossier_fn": 5,
+          "stale_current_record_facts": 5,
+          "refuted_current_record_facts": 0,
+          "extra_answers": 0,
+          "duplicate_answers": 0
+        },
+        "pending_checks": {
+          "refuted_current_record_facts": 5,
+          "event_reapplication_requires_execution_trace": 1
+        }
+      },
+      "details": [
+        {
+          "type": "missing_fact",
+          "fact": {
+            "phase": "D-WOR-07-step3",
+            "evidence": [
+              {
+                "event_id": "D-WOR-07-e3",
+                "quote": "Приняли 4 штуки, это первая часть заказа."
+              }
+            ],
+            "proposal_id": "D-WOR-07-p1",
+            "based_on": {
+              "P-D707": 1
+            },
+            "kind": "field",
+            "purchase": "P-D707",
+            "field": "status",
+            "value": "partially_delivered"
+          }
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-07-a1"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-07-a2"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-07-step4"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-07-step5"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-07-a3"
+        }
+      ],
+      "fully_matches_structured_gold": false,
+      "unsupported": false
+    },
+    {
+      "id": "D-WOR-14",
+      "category": "workflow",
+      "metrics": {
+        "diff_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "diff_recall": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "dossier_precision": {
+          "numerator": 74,
+          "denominator": 77,
+          "value": 0.961038961038961,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "dossier_recall": {
+          "numerator": 74,
+          "denominator": 77,
+          "value": 0.961038961038961,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "conflict_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.9,
+          "critical_below": 0.8
+        },
+        "summary_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "summary_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "format_validity": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_chains": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "literal_citations": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "supported_citations": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "calculation_accuracy": {
+          "numerator": 42,
+          "denominator": 45,
+          "value": 0.9333333333333333,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "purchase_link_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "answers_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": null,
+          "critical_below": null
+        },
+        "arithmetic_consistency": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_checkpoints": {
+          "numerator": 4,
+          "denominator": 7,
+          "value": 0.5714285714285714,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "summary_window_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "case_schema_validity": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "counts": {
+          "missing_cases": 0,
+          "diff_tp": 0,
+          "diff_fp": 0,
+          "diff_fn": 1,
+          "extra_issues": 0,
+          "missing_issues": 0,
+          "dossier_tp": 74,
+          "dossier_fp": 3,
+          "dossier_fn": 3,
+          "stale_current_record_facts": 3,
+          "refuted_current_record_facts": 0,
+          "extra_answers": 0,
+          "duplicate_answers": 0
+        },
+        "pending_checks": {
+          "refuted_current_record_facts": 3,
+          "event_reapplication_requires_execution_trace": 1
+        }
+      },
+      "details": [
+        {
+          "type": "missing_fact",
+          "fact": {
+            "phase": "D-WOR-14-step4",
+            "evidence": [
+              {
+                "event_id": "D-WOR-14-e4",
+                "quote": "Посмотрела решение финансов: лимит 400000 рублей, вот письмо."
+              }
+            ],
+            "proposal_id": "D-WOR-14-p1",
+            "based_on": {
+              "P-D714": 1
+            },
+            "kind": "field",
+            "purchase": "P-D714",
+            "field": "budget",
+            "value": "400000.00"
+          }
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-14-a1"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-14-step5"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-14-a2"
+        }
+      ],
+      "fully_matches_structured_gold": false,
+      "unsupported": false
+    },
+    {
+      "id": "D-WOR-16",
+      "category": "workflow",
+      "metrics": {
+        "diff_precision": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "diff_recall": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "dossier_precision": {
+          "numerator": 74,
+          "denominator": 77,
+          "value": 0.961038961038961,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "dossier_recall": {
+          "numerator": 74,
+          "denominator": 77,
+          "value": 0.961038961038961,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "conflict_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.9,
+          "critical_below": 0.8
+        },
+        "summary_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "summary_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "format_validity": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_chains": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "literal_citations": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "supported_citations": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": null,
+          "pending": 1,
+          "status": "incomplete",
+          "target": 1.0,
+          "critical_below": 1.0,
+          "conservative_lower_bound": 0.0
+        },
+        "calculation_accuracy": {
+          "numerator": 45,
+          "denominator": 45,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "purchase_link_accuracy": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "answers_accuracy": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "pending": 0,
+          "status": "ok",
+          "target": null,
+          "critical_below": null
+        },
+        "arithmetic_consistency": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_checkpoints": {
+          "numerator": 4,
+          "denominator": 7,
+          "value": 0.5714285714285714,
+          "pending": 0,
+          "status": "critical",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "summary_window_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "case_schema_validity": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "counts": {
+          "missing_cases": 0,
+          "diff_tp": 0,
+          "diff_fp": 1,
+          "diff_fn": 1,
+          "extra_issues": 0,
+          "missing_issues": 1,
+          "dossier_tp": 74,
+          "dossier_fp": 3,
+          "dossier_fn": 3,
+          "stale_current_record_facts": 3,
+          "refuted_current_record_facts": 0,
+          "stale_current_answers": 0,
+          "refuted_current_answers": 0,
+          "extra_answers": 0,
+          "duplicate_answers": 0
+        },
+        "pending_checks": {
+          "refuted_current_record_facts": 3,
+          "stale_current_answers": 1,
+          "refuted_current_answers": 1,
+          "event_reapplication_requires_execution_trace": 1
+        }
+      },
+      "details": [
+        {
+          "type": "missing_fact",
+          "fact": {
+            "phase": "D-WOR-16-step4",
+            "evidence": [
+              {
+                "event_id": "D-WOR-16-e4",
+                "quote": "Склад тоже подтвердил 22 ноября 2026 года."
+              }
+            ],
+            "proposal_id": "D-WOR-16-p1",
+            "based_on": {
+              "P-D716": 1
+            },
+            "kind": "field",
+            "purchase": "P-D716",
+            "field": "delivery_date",
+            "value": "2026-11-22"
+          }
+        },
+        {
+          "type": "extra_or_wrong_fact",
+          "fact": {
+            "phase": "D-WOR-16-step3",
+            "evidence": [
+              {
+                "event_id": "D-WOR-16-e3",
+                "quote": "По нашей закупке ремней у Атласа дату согласовали на 22 ноября 2026 года."
+              }
+            ],
+            "proposal_id": "D-WOR-16-step3:llm_single:P-D716",
+            "based_on": {
+              "P-D716": 1
+            },
+            "kind": "field",
+            "purchase": "P-D716",
+            "field": "delivery_date",
+            "value": "2026-11-22"
+          }
+        },
+        {
+          "type": "unsupported_or_pending_evidence",
+          "fact": {
+            "phase": "D-WOR-16-step3",
+            "evidence": [
+              {
+                "event_id": "D-WOR-16-e3",
+                "quote": "По нашей закупке ремней у Атласа дату согласовали на 22 ноября 2026 года."
+              }
+            ],
+            "proposal_id": "D-WOR-16-step3:llm_single:P-D716",
+            "based_on": {
+              "P-D716": 1
+            },
+            "kind": "field",
+            "purchase": "P-D716",
+            "field": "delivery_date",
+            "value": "2026-11-22"
+          },
+          "verdict": null
+        },
+        {
+          "type": "missing_issue",
+          "issue": {
+            "code": "tool_timeout",
+            "after": "D-WOR-16-step3",
+            "purchase_id": "P-D716"
+          }
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-16-a1"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-16-step5"
+        },
+        {
+          "type": "crm_state_mismatch",
+          "after": "D-WOR-16-a2"
+        },
+        {
+          "type": "answer_mismatch",
+          "query_id": "D-WOR-16-a2",
+          "expected": {
+            "unit_price": "13000.00",
+            "currency": "RUB",
+            "quantity": 10,
+            "delivered_quantity": 0,
+            "delivery_date": "2026-11-22"
+          },
+          "actual": {
+            "unit_price": "13000.00",
+            "currency": "RUB",
+            "quantity": 10,
+            "delivered_quantity": 0,
+            "delivery_date": "2026-11-15"
+          }
+        }
+      ],
+      "fully_matches_structured_gold": false,
+      "unsupported": true
+    },
+    {
+      "id": "D-WOR-17",
+      "category": "workflow",
+      "metrics": {
+        "diff_precision": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "diff_recall": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "dossier_precision": {
+          "numerator": 77,
+          "denominator": 77,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "dossier_recall": {
+          "numerator": 77,
+          "denominator": 77,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 0.85,
+          "critical_below": 0.75
+        },
+        "conflict_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.9,
+          "critical_below": 0.8
+        },
+        "summary_precision": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "summary_recall": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 0.95,
+          "critical_below": 0.9
+        },
+        "format_validity": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_chains": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "literal_citations": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "supported_citations": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "calculation_accuracy": {
+          "numerator": 45,
+          "denominator": 45,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "purchase_link_accuracy": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "answers_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": null,
+          "critical_below": null
+        },
+        "arithmetic_consistency": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "crm_checkpoints": {
+          "numerator": 7,
+          "denominator": 7,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "summary_window_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null,
+          "pending": 0,
+          "status": "not_applicable",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "case_schema_validity": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0,
+          "pending": 0,
+          "status": "ok",
+          "target": 1.0,
+          "critical_below": 1.0
+        },
+        "counts": {
+          "missing_cases": 0,
+          "diff_tp": 2,
+          "diff_fp": 0,
+          "diff_fn": 0,
+          "extra_issues": 2,
+          "missing_issues": 1,
+          "dossier_tp": 77,
+          "dossier_fp": 0,
+          "dossier_fn": 0,
+          "extra_answers": 0,
+          "duplicate_answers": 0
+        },
+        "pending_checks": {
+          "event_reapplication_requires_execution_trace": 1
+        }
+      },
+      "details": [
+        {
+          "type": "missing_issue",
+          "issue": {
+            "code": "step_budget_exhausted",
+            "after": "D-WOR-17-step3",
+            "purchase_id": "P-D717"
+          }
+        },
+        {
+          "type": "extra_issue",
+          "issue": {
+            "code": "ambiguous_purchase",
+            "event_id": "D-WOR-17-e3",
+            "after": "D-WOR-17-step3"
+          }
+        },
+        {
+          "type": "extra_issue",
+          "issue": {
+            "code": "ambiguous_purchase",
+            "after": "D-WOR-17-step5"
+          }
+        }
+      ],
+      "fully_matches_structured_gold": false,
+      "unsupported": true
+    }
+  ],
+  "judge_calls": [],
+  "not_evaluated": {
+    "asr_ocr": "No audio/video inputs or paired transcripts.",
+    "execution_trace": "Dataset-shaped JSONL contains snapshots, not actual tool execution audit logs.",
+    "arbitrary_forbidden_actions": "Free-text prohibitions are not executable assertions; only implemented structural checks are scored."
+  },
+  "all_structured_cases_match": false,
+  "complete_semantic_evaluation": false,
+  "limitations": [
+    "CRM metrics compare REPORTED snapshots; JSONL alone cannot prove actual tool/transaction execution.",
+    "Repeated-event execution and injected failures require a runner audit trace, unavailable in dataset-shaped gold.",
+    "Audio/OCR not evaluated. Free-text forbidden_actions are not universally executable assertions.",
+    "Dossier metrics compare fields at required snapshots, including nulls; they are distinct from pre-approval diff metrics.",
+    "Calculation accuracy compares numeric fields to gold; arithmetic_consistency tests explicit quantity*price and remaining calculations only.",
+    "Totals use quantity*unit_price, adding VAT only when price_includes_vat=false and vat_rate exists; ROUND_HALF_UP to 0.01. Delivery/discounts require explicit separate rules.",
+    "Semantic decisions reuse gold annotations when identical; this does not independently validate the gold itself."
+  ],
+  "judge_config": {
+    "mode": "off",
+    "model": null,
+    "base_url": null,
+    "max_judge_chars": 120000,
+    "temperature": 0,
+    "retries": 1,
+    "timeout": 60
+  },
+  "unsupported_fault_injections": {
+    "D-WOR-16": [
+      {
+        "at": "D-WOR-16-step3",
+        "operation": "find_purchase",
+        "fault": "timeout",
+        "once": true
+      }
+    ],
+    "D-WOR-17": [
+      {
+        "at": "D-WOR-17-step3",
+        "operation": "read_evidence",
+        "fault": "step_budget_exhausted",
+        "once": true
+      }
+    ]
+  }
+}
