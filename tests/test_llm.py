@@ -1,4 +1,4 @@
-"""llm_single на поддельном клиенте Ollama: сборка предложений, повтор JSON, бюджет и таймаут."""
+"""B1 и S1 на поддельном клиенте Ollama: сборка, повтор JSON, бюджет, развилка, сбои, куски, контекст."""
 
 import json
 
@@ -6,27 +6,35 @@ import pytest
 
 from snab.contracts import EpisodeContext, StopReason
 from snab.crm import MockCrm
-from snab.systems.llm import LlmSingleSystem
+from snab.systems import build_system
+from snab.systems.llm import PROMPT_TOKEN_BUDGET, LlmSystem, estimate_tokens, trim_request
 from snab.tools import DEFAULT_BUDGET, FaultInjector, ModelTools, StepBudget
 from snab.trace import Tracer
 
 TEXT = "По P-1 бюджет 4 млн рублей."
-STATE = {"purchases": {"P-1": {"revision": 3, "fields": {"budget": "5000000.00"}}}, "tasks": {}}
-CONTEXT = EpisodeContext(
-    episode_id="step1",
-    events=[{"id": "e1", "text": TEXT}],
-    seen_events=[{"id": "e1", "text": TEXT}],
-    crm_state=STATE,
-)
+FIELDS = {"supplier": "Атлас", "title": "Ремни", "budget": "5000000.00", "delivery_date": "2026-11-15"}
+STATE = {"purchases": {"P-1": {"revision": 3, "fields": FIELDS}}, "tasks": {}}
+EVENT = {"id": "e1", "text": TEXT}
+OFFER_CHUNK = {"id": "m2", "source_id": "meet", "text": "По P-1 при полной предоплате могу по 12000 рублей отдать."}
+UNLINKED = {"id": "e3", "text": "По ремням у Атласа дату согласовали на 22 ноября 2026 года."}
+
+
+def change(field: str, value: object, event: dict, quote: str, status: str = "agreed") -> dict:
+    """Операция set_field в формате ответа модели."""
+    return {
+        "op": "set_field",
+        "purchase_id": "P-1",
+        "field": field,
+        "value": value,
+        "status": status,
+        "evidence": [{"event_id": event["id"], "quote": quote}],
+    }
+
+
+BUDGET_CHANGE = change("budget", "4000000.00", EVENT, "бюджет 4 млн рублей")
 VALID = {
     "changes": [
-        {
-            "op": "set_field",
-            "purchase_id": "P-1",
-            "field": "budget",
-            "value": "4000000.00",
-            "evidence": [{"event_id": "e1", "quote": "бюджет 4 млн рублей"}],
-        },
+        BUDGET_CHANGE,
         {
             "op": "create_task",
             "purchase_id": "P-1",
@@ -36,12 +44,20 @@ VALID = {
             "evidence": [{"event_id": "e1", "quote": TEXT}],
         },
     ],
-    "issues": [{"code": "unresolved_terms", "event_id": "e1"}],
+    "issues": [{"code": "untrusted_instruction", "event_id": "e1"}],
 }
+DATE_REPLY = json.dumps(
+    {"changes": [change("delivery_date", "2026-11-22", UNLINKED, "22 ноября 2026 года")], "issues": []}
+)
+
+
+def tool_call(name: str, **arguments: object) -> dict:
+    """Сообщение модели с одним вызовом инструмента."""
+    return {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": name, "arguments": arguments}}]}
 
 
 class FakeClient:
-    """Отдает заготовленные ответы по очереди; TimeoutError в очереди имитирует зависание."""
+    """Отдает заготовленные ответы по очереди: строку контента, сообщение с tool_calls или исключение."""
 
     def __init__(self, replies: list) -> None:
         self.replies = list(replies)
@@ -53,22 +69,50 @@ class FakeClient:
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
-        return {"message": {"content": reply}, "prompt_eval_count": 100, "eval_count": 20}
+        message = reply if isinstance(reply, dict) else {"role": "assistant", "content": reply}
+        return {"message": message, "prompt_eval_count": 100, "eval_count": 20}
 
     def model_digest(self, model: str) -> str:
         """Фиксированный digest."""
         return "sha256:fake"
 
+    def request(self, index: int) -> dict:
+        """JSON-вход куска из вызова номер index."""
+        return json.loads(self.payloads[index]["messages"][1]["content"])
 
-def make_tools(budget: StepBudget = DEFAULT_BUDGET) -> ModelTools:
-    """Инструменты над CRM из STATE с заданным бюджетом."""
+
+def make_tools(state: dict = STATE, faults: list | None = None, budget: StepBudget = DEFAULT_BUDGET) -> ModelTools:
+    """Инструменты над CRM из state; точка инъекции - step1."""
     crm = MockCrm()
-    crm.load(STATE)
-    return ModelTools(crm, FaultInjector([]), Tracer("run", "case", 1), budget)
+    crm.load(state)
+    injector = FaultInjector(faults or [])
+    injector.point = "step1"
+    return ModelTools(crm, injector, Tracer("run", "case", 1), budget)
+
+
+def make_context(events: list[dict], seen: list[dict] | None = None, episode: str = "step1", **extra) -> EpisodeContext:
+    """Контекст куска: новые события и все поступившие к нему."""
+    return EpisodeContext(
+        episode_id=episode, events=events, seen_events=[*(seen or []), *events], crm_state=STATE, **extra
+    )
+
+
+def single(replies: list) -> tuple[LlmSystem, FakeClient]:
+    """B1 на поддельном клиенте."""
+    client = FakeClient(replies)
+    return LlmSystem("llm_single", use_tools=False, client=client), client
+
+
+def agent(replies: list) -> tuple[LlmSystem, FakeClient]:
+    """S1 на поддельном клиенте."""
+    client = FakeClient(replies)
+    return LlmSystem("agent", use_tools=True, client=client), client
 
 
 def test_reply_becomes_one_proposal_per_purchase() -> None:
-    output = LlmSingleSystem(FakeClient([json.dumps(VALID)])).process_episode(CONTEXT, make_tools())
+    system, _ = single([json.dumps(VALID)])
+
+    output = system.process_episode(make_context([EVENT]), make_tools())
 
     assert output.proposals == [
         {
@@ -76,7 +120,7 @@ def test_reply_becomes_one_proposal_per_purchase() -> None:
             "available_after": "step1",
             "based_on": {"P-1": 3},
             "operations": [
-                VALID["changes"][0],
+                {key: value for key, value in BUDGET_CHANGE.items() if key != "status"},
                 {
                     "op": "create_task",
                     "task": {
@@ -92,41 +136,377 @@ def test_reply_becomes_one_proposal_per_purchase() -> None:
             ],
         }
     ]
-    assert output.issues == [{"code": "unresolved_terms", "after": "step1", "event_id": "e1"}]
-    assert [(step.kind, step.tokens_in, step.tokens_out) for step in output.trace_steps] == [("llm", 100, 20)]
+    assert output.issues == [{"code": "untrusted_instruction", "event_id": "e1", "after": "step1"}]
+    assert output.stop_reason == StopReason.CLARIFY
+    assert [(step.kind, step.tokens_in) for step in output.trace_steps] == [("llm", 100), ("system", 0)]
+
+
+@pytest.mark.parametrize(
+    ("issue", "kept"),
+    [
+        ({"code": "ambiguous_purchase", "event_id": "e1"}, False),
+        ({"code": "ambiguous_purchase", "event_id": "e3"}, True),
+        ({"code": "unresolved_terms", "event_id": "e1", "purchase_id": "P-1"}, False),
+        ({"code": "unknown_speaker_authority", "event_id": "e3"}, False),
+    ],
+)
+def test_model_issue_checked_by_code(issue: dict, kept: bool) -> None:
+    # e1 называет P-1 и дает пакет по P-1; e3 без номера
+    reply = {"changes": [BUDGET_CHANGE], "issues": [issue]}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([EVENT, UNLINKED]), make_tools())
+
+    assert [item["code"] for item in output.issues] == ([issue["code"]] if kept else [])
+
+
+def test_quote_not_in_source_drops_operation() -> None:
+    reply = {"changes": [change("budget", "4000000.00", EVENT, "бюджет 3 млн")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+
+    output = system.process_episode(make_context([EVENT]), make_tools())
+
+    assert (output.proposals, output.stop_reason) == ([], StopReason.DONE)
 
 
 def test_invalid_json_is_retried_once() -> None:
-    client = FakeClient(["не JSON", json.dumps(VALID)])
+    system, client = single(["не JSON", json.dumps(VALID)])
 
-    output = LlmSingleSystem(client).process_episode(CONTEXT, make_tools())
+    output = system.process_episode(make_context([EVENT]), make_tools())
 
-    assert output.stop_reason == StopReason.DONE
-    assert [step.error for step in output.trace_steps] == ["invalid_output", None]
+    assert len(output.proposals) == 1
+    assert [step.error for step in output.trace_steps if step.kind == "llm"] == ["invalid_output", None]
     assert client.payloads[1]["messages"][-2] == {"role": "assistant", "content": "не JSON"}
 
 
 @pytest.mark.parametrize(
-    ("replies", "budget", "stop_reason", "issues"),
+    ("replies", "budget", "stop_reason", "issue_code"),
     [
-        (["{}", "{}"], StepBudget(), StopReason.INVALID_OUTPUT, []),
-        (["{}"], StepBudget(max_model_calls=1), StopReason.BUDGET_EXHAUSTED, [{"code": "step_budget_exhausted"}]),
-        ([TimeoutError("slow")], StepBudget(), StopReason.TIMEOUT, []),
+        (["{}", "{}"], StepBudget(), StopReason.INVALID_OUTPUT, "invalid_output"),
+        (["{}"], StepBudget(max_model_calls=1), StopReason.BUDGET_EXHAUSTED, "step_budget_exhausted"),
+        ([TimeoutError("slow")], StepBudget(), StopReason.TIMEOUT, "model_timeout"),
     ],
 )
-def test_failed_extraction_proposes_nothing(
-    replies: list, budget: StepBudget, stop_reason: StopReason, issues: list
+def test_failed_extraction_proposes_nothing_and_says_why(
+    replies: list, budget: StepBudget, stop_reason: StopReason, issue_code: str
 ) -> None:
-    output = LlmSingleSystem(FakeClient(replies)).process_episode(CONTEXT, make_tools(budget))
+    system, _ = single(replies)
+
+    output = system.process_episode(make_context([EVENT]), make_tools(budget=budget))
 
     assert output.proposals == []
     assert output.stop_reason == stop_reason
-    assert [{"code": issue["code"]} for issue in output.issues] == issues
+    assert [issue["code"] for issue in output.issues] == [issue_code]
 
 
-def test_describe_records_model_and_prompts() -> None:
-    meta = LlmSingleSystem(FakeClient([])).describe()
+def test_chunk_over_context_budget_stops_without_model_call() -> None:
+    meeting = {"id": "e24", "text": "По P-1 обсуждали маркировку. " * 1000}
+    system, client = single([])
 
-    assert meta["model_digest"] == "sha256:fake"
-    assert meta["temperature"] == 0
-    assert set(meta["prompt_hashes"]) == set(meta["prompts"]) == {"extract", "answer", "retry"}
+    output = system.process_episode(make_context([meeting]), make_tools())
+
+    assert client.payloads == []
+    assert output.stop_reason == StopReason.BUDGET_EXHAUSTED
+    assert output.issues == [{"code": "context_overflow", "after": "step1", "event_id": "e24"}]
+
+
+def test_single_never_searches() -> None:
+    system, client = single([DATE_REPLY])
+
+    output = system.process_episode(make_context([UNLINKED]), make_tools())
+
+    assert len(output.proposals) == 1
+    assert ["tools" in payload for payload in client.payloads] == [False]
+
+
+def test_agent_skips_branch_when_chunk_names_purchase() -> None:
+    system, client = agent([json.dumps(VALID)])
+
+    system.process_episode(make_context([EVENT]), make_tools())
+
+    assert len(client.payloads) == 1
+    assert "tools" not in client.payloads[0]
+
+
+def test_agent_searches_then_extracts() -> None:
+    system, client = agent([tool_call("find_purchase", query="ремни Атлас"), "нет", DATE_REPLY])
+    tools = make_tools()
+
+    output = system.process_episode(make_context([UNLINKED]), tools)
+
+    assert [op["value"] for proposal in output.proposals for op in proposal["operations"]] == ["2026-11-22"]
+    assert [(record["name"], record["error"]) for record in tools.tracer.records] == [("find_purchase", None)]
+    assert [step.name for step in output.trace_steps] == ["search", "search", "extract", "merge"]
+    tool_message = client.payloads[2]["messages"][-2]
+    assert tool_message["role"] == "tool" and "P-1" in tool_message["content"]
+
+
+def test_agent_spends_at_most_three_model_calls() -> None:
+    searches = [tool_call("read_purchase", purchase_id="P-1"), tool_call("read_purchase", purchase_id="P-1")]
+    system, client = agent([*searches, "не JSON"])
+
+    output = system.process_episode(make_context([UNLINKED]), make_tools())
+
+    assert len(client.payloads) == 3
+    assert output.stop_reason == StopReason.BUDGET_EXHAUSTED
+    assert output.proposals == []
+
+
+def test_find_purchase_timeout_asks_purchaser_and_next_chunk_sees_question() -> None:
+    fault = [{"at": "step1", "operation": "find_purchase", "fault": "timeout", "once": True}]
+    follow_up = {"id": "e4", "text": "Склад тоже подтвердил 22 ноября 2026 года."}
+    replies = [tool_call("find_purchase", query="ремни"), DATE_REPLY, "нет", json.dumps({"changes": [], "issues": []})]
+    system, client = agent(replies)
+
+    output = system.process_episode(make_context([UNLINKED]), make_tools(faults=fault))
+    system.process_episode(make_context([follow_up], seen=[UNLINKED], episode="step2"), make_tools())
+
+    assert output.proposals == []
+    assert output.stop_reason == StopReason.TOOL_ERROR
+    assert output.issues == [{"code": "tool_timeout", "event_id": "e3", "purchase_id": "P-1", "after": "step1"}]
+    assert client.request(3)["open_questions"] == [
+        {"code": "tool_timeout", "purchase_id": "P-1", "event_id": "e3", "text": UNLINKED["text"]}
+    ]
+
+
+def test_read_evidence_budget_fault_stops_without_extraction() -> None:
+    fault = [{"at": "step1", "operation": "read_evidence", "fault": "step_budget_exhausted", "once": True}]
+    old_letter = {"id": "e3", "text": "По этим ремням из старого письма новая цена есть, номер не помню."}
+    system, client = agent([tool_call("read_evidence", purchase_id="P-1")])
+
+    output = system.process_episode(make_context([old_letter]), make_tools(faults=fault))
+
+    assert len(client.payloads) == 1
+    assert output.stop_reason == StopReason.BUDGET_EXHAUSTED
+    assert output.issues == [
+        {"code": "step_budget_exhausted", "after": "step1", "event_id": "e3", "purchase_id": "P-1"}
+    ]
+
+
+def test_tool_calls_over_limit_are_refused_visibly() -> None:
+    calls = [
+        {"function": {"name": "find_purchase", "arguments": {"query": "ремни Атлас"}}},
+        {"function": {"name": "read_purchase", "arguments": {"purchase_id": "P-1"}}},
+        {"function": {"name": "read_evidence", "arguments": {"purchase_id": "P-1"}}},
+    ]
+    system, client = agent([{"role": "assistant", "content": "", "tool_calls": calls}, DATE_REPLY])
+    tools = make_tools()
+
+    output = system.process_episode(make_context([UNLINKED]), tools)
+
+    # Лимит два вызова: третий отклонен харнессом, а не выброшен молча
+    assert [(record["name"], record["error"]) for record in tools.tracer.records] == [
+        ("find_purchase", None),
+        ("read_purchase", None),
+        ("read_evidence", "budget_exhausted"),
+    ]
+    assert [message["role"] for message in client.payloads[1]["messages"]].count("tool") == 3
+    assert output.proposals == []
+    assert output.stop_reason == StopReason.BUDGET_EXHAUSTED
+    assert output.issues == [
+        {"code": "step_budget_exhausted", "event_id": "e3", "purchase_id": "P-1", "after": "step1"}
+    ]
+
+
+def test_oversized_tool_results_stop_before_final_call() -> None:
+    old_letter = {"id": "e3", "text": "По этим ремням из старого письма новая цена есть, номер не помню."}
+    earlier = {"id": "e0", "text": "По P-1 обсуждали маркировку. " * 700}
+    system, client = agent([tool_call("read_evidence", purchase_id="P-1")])
+    tools = make_tools()
+    tools.add_sources([earlier])
+
+    output = system.process_episode(make_context([old_letter]), tools)
+
+    assert len(client.payloads) == 1
+    assert output.stop_reason == StopReason.BUDGET_EXHAUSTED
+    assert output.issues == [{"code": "context_overflow", "after": "step1", "event_id": "e3"}]
+    overflow = output.trace_steps[-1]
+    assert overflow.name == "context_overflow"
+    assert overflow.args["context"]["estimated_tokens"] > PROMPT_TOKEN_BUDGET
+
+
+def test_contradiction_in_open_meeting_is_asked_after_source_ends() -> None:
+    both = {"id": "m2", "source_id": "meet", "text": "По P-1 Анна: берём по 100. Борис: берём по 120."}
+    close = {"id": "m8", "source_id": "meet", "text": "По P-1 на этом всё."}
+    first = {
+        "changes": [
+            change("unit_price", "100", both, "берём по 100"),
+            change("unit_price", "120", both, "берём по 120"),
+        ],
+        "issues": [],
+    }
+    system, _ = single([json.dumps(first), json.dumps({"changes": [], "issues": []})])
+
+    partial = system.process_episode(make_context([{**both, "source_complete": False}], episode="step3"), make_tools())
+    final = system.process_episode(
+        make_context([{**close, "source_complete": True}], seen=[both], episode="step4"), make_tools()
+    )
+
+    assert (partial.proposals, partial.issues) == ([], [])
+    assert final.proposals == []
+    assert final.issues == [
+        {"code": "unresolved_terms", "purchase_id": "P-1", "field": "unit_price", "event_ids": ["m2"], "after": "step4"}
+    ]
+
+
+def test_question_without_purchase_closes_when_proposal_cites_its_event() -> None:
+    fault = [{"at": "step1", "operation": "find_purchase", "fault": "timeout", "once": True}]
+    # Ни одно слово не совпадает с карточкой: предполагаемой закупки у вопроса нет
+    vague = {"id": "e5", "text": "Дату согласовали на 22 ноября 2026 года."}
+    linked = {"id": "e6", "text": "По P-1 подтверждаю."}
+    later = {"id": "e7", "text": "По P-1 больше ничего."}
+    empty = json.dumps({"changes": [], "issues": []})
+    cites_vague = json.dumps(
+        {"changes": [change("delivery_date", "2026-11-22", vague, "22 ноября 2026 года")], "issues": []}
+    )
+    system, client = agent([tool_call("find_purchase", query="дата"), empty, cites_vague, empty])
+
+    system.process_episode(make_context([vague]), make_tools(faults=fault))
+    system.process_episode(make_context([linked], seen=[vague], episode="step2"), make_tools())
+    system.process_episode(make_context([later], seen=[vague, linked], episode="step3"), make_tools())
+
+    assert client.request(2)["open_questions"] == [
+        {"code": "tool_timeout", "purchase_id": None, "event_id": "e5", "text": vague["text"]}
+    ]
+    assert client.request(3)["open_questions"] == []
+
+
+def test_meeting_chunks_become_one_package_after_source_ends() -> None:
+    offer = {**OFFER_CHUNK, "occurred_at": "2026-11-03T10:15:00+03:00", "chunk_index": 2}
+    accept = {
+        "id": "m8",
+        "source_id": "meet",
+        "occurred_at": "2026-11-03T11:10:00+03:00",
+        "chunk_index": 8,
+        "text": "По P-1 финансы подтвердили, по 12000 рублей берём.",
+    }
+    state = {
+        "purchases": {"P-1": {"revision": 1, "fields": {"unit_price": "13000.00", "prepayment_percent": 0}}},
+        "tasks": {},
+    }
+    first = {
+        "changes": [
+            change("unit_price", "12000.00", offer, "по 12000 рублей", "conditional"),
+            change("prepayment_percent", 100, offer, "при полной предоплате", "conditional"),
+        ],
+        "issues": [],
+    }
+    second = {"changes": [change("unit_price", "12000.00", accept, "по 12000 рублей берём")], "issues": []}
+    system, client = single([json.dumps(first), json.dumps(second)])
+
+    def chunk(event: dict, complete: bool, seen: list[dict], episode: str) -> EpisodeContext:
+        """Кусок встречи с пометкой конца записи от раннера."""
+        return EpisodeContext(
+            episode_id=episode,
+            events=[{**event, "source_complete": complete}],
+            seen_events=[*seen, event],
+            crm_state=state,
+        )
+
+    partial = system.process_episode(chunk(offer, False, [], "step3"), make_tools(state))
+    final = system.process_episode(chunk(accept, True, [offer], "step4"), make_tools(state))
+
+    assert partial.proposals == []
+    assert [entry["status"] for entry in client.request(1)["draft"]] == ["conditional", "conditional"]
+    operations = final.proposals[0]["operations"]
+    assert [(op["field"], op["value"]) for op in operations] == [
+        ("prepayment_percent", 100),
+        ("unit_price", "12000.00"),
+    ]
+    assert [quote["event_id"] for quote in operations[0]["evidence"]] == ["m2", "m8"]
+
+
+def test_repeated_case_starts_with_empty_session() -> None:
+    offer = OFFER_CHUNK
+    reply = json.dumps(
+        {"changes": [change("unit_price", "12000.00", offer, "по 12000 рублей", "conditional")], "issues": []}
+    )
+    system, client = single([reply, reply])
+    context = EpisodeContext(
+        episode_id="step3", events=[{**offer, "source_complete": False}], seen_events=[offer], crm_state=STATE
+    )
+
+    system.process_episode(context, make_tools())
+    system.process_episode(context, make_tools())
+
+    assert client.request(1)["draft"] == []
+
+
+def test_unknown_speaker_change_is_question_not_proposal() -> None:
+    voice = {"id": "e2", "speaker_id": "SPEAKER_01", "text": "По P-1 лимит теперь 800000 рублей."}
+    reply = {"changes": [change("budget", "800000.00", voice, "лимит теперь 800000 рублей")], "issues": []}
+    system, _ = single([json.dumps(reply)])
+    registry = {"Марина": {"can_confirm": ["budget"]}}
+
+    output = system.process_episode(make_context([voice], authority_registry=registry), make_tools())
+
+    assert output.proposals == []
+    assert output.issues == [
+        {"code": "unknown_speaker_authority", "event_id": "e2", "purchase_id": "P-1", "after": "step1"}
+    ]
+    assert output.stop_reason == StopReason.CLARIFY
+
+
+def card(pid: str, supplier: str) -> dict:
+    """Компактная карточка с поставщиком и длинным описанием."""
+    return {"supplier": supplier, "title": "Позиция " + "x" * 400}
+
+
+def trimmed(fixed_tokens: int) -> tuple[dict, dict]:
+    """Запрос с целевой карточкой P-1, двумя посторонними и двумя старыми цитатами."""
+    request = {
+        "events": [{"id": "e9", "text": "По P-1 и поставщику Вектор срок сдвинули."}],
+        "cards": {"P-1": card("P-1", "Атлас"), "P-2": card("P-2", "Вектор"), "P-3": card("P-3", "Орбита")},
+        "omitted_purchase_ids": [],
+        "tasks": [],
+        "draft": [{"purchase_id": "P-1", "quote": "q" * 300}],
+        "open_questions": [{"purchase_id": "P-1", "text": "t" * 300}],
+    }
+    return trim_request(request, fixed_tokens, {"P-1"}, request["events"][0]["text"])
+
+
+def test_context_trim_drops_old_quotes_first() -> None:
+    _, untouched = trimmed(0)
+    without_quotes = estimate_tokens("q" * 300) + estimate_tokens("t" * 300)
+
+    request, stats = trimmed(PROMPT_TOKEN_BUDGET - untouched["estimated_tokens"] + without_quotes // 2)
+
+    assert stats["quotes_dropped"] == 2
+    assert request["open_questions"][0]["text"] is None and request["draft"][0]["quote"] is None
+    assert sorted(request["cards"]) == ["P-1", "P-2", "P-3"]
+
+
+def test_context_trim_then_drops_unmentioned_cards_but_never_target() -> None:
+    request, stats = trimmed(PROMPT_TOKEN_BUDGET)
+
+    # Орбита не совпала со словами куска и уходит раньше Вектора
+    assert stats["cards_omitted"] == ["P-2", "P-3"] and request["omitted_purchase_ids"] == ["P-2", "P-3"]
+    assert list(request["cards"]) == ["P-1"]
+    assert stats["over_budget"] is True
+
+
+def test_context_trim_keeps_everything_that_fits() -> None:
+    request, stats = trimmed(0)
+
+    assert (stats["quotes_dropped"], stats["cards_omitted"], stats["over_budget"]) == (0, [], False)
+
+
+def test_answer_query_returns_model_answer() -> None:
+    system, _ = single([json.dumps({"answer": {"budget": "5000000.00"}})])
+    query = {"id": "a1", "text": "Какой лимит по P-1?"}
+
+    output = system.answer_query(make_context([]), query, make_tools())
+
+    assert output.answers == [{"query_id": "a1", "answer": {"budget": "5000000.00"}, "evidence": []}]
+
+
+@pytest.mark.parametrize("name", ["llm_single", "agent"])
+def test_describe_records_model_prompts_and_schemas(name: str) -> None:
+    system = build_system(name)
+    system.client = FakeClient([])
+
+    meta = system.describe()
+
+    assert meta["system"] == name and meta["model_digest"] == "sha256:fake"
+    expected = {"extract", "answer", "retry"} | ({"tools", "final"} if name == "agent" else set())
+    assert set(meta["prompt_hashes"]) == set(meta["prompts"]) == expected

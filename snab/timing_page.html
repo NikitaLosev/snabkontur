@@ -37,14 +37,20 @@
   <h1>Замер времени закупщика</h1>
 
   <section id="login">
-    <p>Введите имя. Под одним именем каждый кейс проходится один раз; режим кейса назначается автоматически.</p>
+    <p>Введите имя и группу. Под одним именем каждый кейс проходится один раз; режим кейса задает группа.</p>
+    <p class="muted">Группу назначает организатор так, чтобы людей в A и B было поровну. Если не назначил, оставьте подсказанную. После первой сдачи группа не меняется.</p>
     <input id="participant" placeholder="Имя участника" autocomplete="off">
+    <span class="group-choice">Группа:
+      <label><input type="radio" name="group" value="A"> A</label>
+      <label><input type="radio" name="group" value="B"> B</label>
+    </span>
     <button class="primary" id="login-button">Показать кейсы</button>
+    <p id="group-hint" class="muted"></p>
     <p id="login-error" class="error"></p>
   </section>
 
   <section id="cases" class="hidden">
-    <p>Участник: <b id="participant-name"></b> · <a href="#" id="logout">сменить</a></p>
+    <p>Участник: <b id="participant-name"></b> · группа <b id="group-name"></b> · <a href="#" id="logout">сменить</a></p>
     <div class="case-list" id="case-list"></div>
   </section>
 
@@ -102,7 +108,7 @@ const MODE_HELP = {
 };
 const MODE_NAMES = { manual: "ручной ввод", review: "проверка диффа" };
 const $ = (id) => document.getElementById(id);
-const state = { participant: "", view: null, startedAt: null, pauses: [], pausedAt: null, tick: null, running: false };
+const state = { participant: "", group: "", view: null, startedAt: null, pauses: [], pausedAt: null, tick: null, running: false };
 
 function show(id, visible) { $(id).classList.toggle("hidden", !visible); }
 
@@ -133,10 +139,35 @@ async function api(path, options) {
   return body;
 }
 
+function groupRadios() { return [...document.querySelectorAll("input[name=group]")]; }
+
+function selectedGroup() {
+  const checked = groupRadios().find((radio) => radio.checked);
+  return checked ? checked.value : "";
+}
+
+async function suggestGroup() {
+  const name = $("participant").value.trim();
+  groupRadios().forEach((radio) => { radio.disabled = false; });
+  if (!name) { $("group-hint").textContent = ""; return; }
+  const body = await api(`/api/group?participant=${encodeURIComponent(name)}`);
+  if (name !== $("participant").value.trim()) return;
+  const group = body.locked || body.suggested;
+  groupRadios().forEach((radio) => { radio.checked = radio.value === group; radio.disabled = Boolean(body.locked) && radio.value !== body.locked; });
+  $("group-hint").textContent = body.locked
+    ? `Вы уже сдавали кейсы в группе ${body.locked}, группа закреплена.`
+    : `Подсказка по имени: группа ${body.suggested}.`;
+}
+
+function participantQuery() { return `participant=${encodeURIComponent(state.participant)}&group=${encodeURIComponent(state.group)}`; }
+
 async function login() {
   const name = $("participant").value.trim();
   if (!name) { $("login-error").textContent = "Введите имя"; return; }
+  const group = selectedGroup();
+  if (!group) { $("login-error").textContent = "Выберите группу"; return; }
   state.participant = name;
+  state.group = group;
   try {
     await loadCases();
     $("login-error").textContent = "";
@@ -144,8 +175,9 @@ async function login() {
 }
 
 async function loadCases() {
-  const body = await api(`/api/cases?participant=${encodeURIComponent(state.participant)}`);
+  const body = await api(`/api/cases?${participantQuery()}`);
   $("participant-name").textContent = state.participant;
+  $("group-name").textContent = state.group;
   const list = $("case-list");
   list.replaceChildren();
   body.cases.forEach((item, index) => {
@@ -158,7 +190,7 @@ async function loadCases() {
 }
 
 async function openCase(caseId, index) {
-  const view = await api(`/api/case?participant=${encodeURIComponent(state.participant)}&id=${encodeURIComponent(caseId)}`);
+  const view = await api(`/api/case?${participantQuery()}&id=${encodeURIComponent(caseId)}`);
   Object.assign(state, { view, startedAt: null, pauses: [], pausedAt: null, running: false });
   $("case-title").textContent = `Кейс ${index + 1} · ${MODE_NAMES[view.mode]}`;
   $("mode-help").textContent = MODE_HELP[view.mode] + " Текст и форма откроются после «Начать».";
@@ -355,7 +387,7 @@ async function finish() {
   if (rows.some((row) => row.decision === null)) { $("case-error").textContent = "Примите или отклоните каждую строку системы"; return; }
   const operations = review ? rows.filter((row) => row.decision === "accept").map((row) => rowOperation(row.row)) : manualOperations();
   const payload = {
-    participant: state.participant, case_id: state.view.case_id, started_at: state.startedAt, finished_at: finishedAt,
+    participant: state.participant, group: state.group, case_id: state.view.case_id, started_at: state.startedAt, finished_at: finishedAt,
     pauses: state.pauses, operations,
     review_rows: rows.map(({ source, decision, edited }) => ({ source, decision, edited })),
   };
@@ -381,7 +413,9 @@ function back() {
 
 $("login-button").addEventListener("click", login);
 $("participant").addEventListener("keydown", (event) => { if (event.key === "Enter") login(); });
-$("logout").addEventListener("click", (event) => { event.preventDefault(); show("cases", false); show("login", true); });
+const refreshGroup = () => suggestGroup().catch((error) => { $("login-error").textContent = error.message; });
+$("participant").addEventListener("input", refreshGroup);
+$("logout").addEventListener("click", (event) => { event.preventDefault(); show("cases", false); show("login", true); refreshGroup(); });
 $("start").addEventListener("click", start);
 $("pause").addEventListener("click", togglePause);
 $("finish").addEventListener("click", finish);

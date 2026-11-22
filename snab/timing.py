@@ -3,8 +3,10 @@
 python -m snab.timing --predictions runs/<run>/predictions.jsonl  запускает локальную страницу;
 python -m snab.timing --summary  считает медианы времени и precision/recall по runs/timing/*.jsonl.
 
-Режим кейса задается контрбалансом: четность хэша имени участника решает, какие кейсы
-он заполняет вручную, а какие проверяет. Время считается по меткам браузера без пауз,
+Режим кейса задается контрбалансом: группа A или B, выбранная на входе, решает, какие кейсы
+участник заполняет вручную, а какие проверяет; у группы A и группы B режимы противоположны.
+Четность хэша имени только подсказывает группу: двое могут получить одну четность, поэтому
+группу выбирают явно. После первой сдачи группа участника закреплена. Время считается по меткам браузера без пауз,
 правильность считает сервер по gold, участнику она не показывается.
 """
 
@@ -38,6 +40,7 @@ PAGE_PATH = Path(__file__).with_name("timing_page.html")
 # предоплаты, поручение с ответственным и сроком, условное предложение, относительные даты
 DEFAULT_IDS = ("E10", "E14", "D-WOR-01", "D-EXT-07", "D-DEC-01", "E12")
 MANUAL, REVIEW = "manual", "review"
+GROUPS = ("A", "B")
 REVIEW_COUNTS = {("system", "accept"): "accepted", ("system", "reject"): "rejected", ("added", "accept"): "added"}
 MAX_BODY_BYTES = 1_000_000
 SECONDS_DIGITS = 3
@@ -68,18 +71,30 @@ def participant_parity(participant: str) -> int:
     return digest[0] % 2
 
 
-def assign_cases(participant: str, case_ids: tuple[str, ...]) -> list[dict]:
-    """Участник и порядок кейсов -> [{case_id, mode}], режимы чередуются со сдвигом по четности."""
-    parity = participant_parity(participant)
+def suggested_group(participant: str) -> str:
+    """Имя участника -> группа по умолчанию: A при четном хэше, B при нечетном."""
+    return GROUPS[participant_parity(participant)]
+
+
+def require_group(value: object) -> str:
+    """Внешний вход: 'A' или 'B', иначе ValueError."""
+    if value not in GROUPS:
+        raise ValueError(f"group must be one of {', '.join(GROUPS)}")
+    return value
+
+
+def assign_cases(group: str, case_ids: tuple[str, ...]) -> list[dict]:
+    """Группа и порядок кейсов -> [{case_id, mode}]; A начинает с ручного ввода, B с проверки."""
+    parity = GROUPS.index(group)
     return [
         {"case_id": case_id, "mode": MANUAL if (index + parity) % 2 == 0 else REVIEW}
         for index, case_id in enumerate(case_ids)
     ]
 
 
-def assigned_mode(participant: str, case_ids: tuple[str, ...], case_id: str) -> str:
-    """Режим кейса для участника; кейс вне списка — ошибка запроса."""
-    modes = {item["case_id"]: item["mode"] for item in assign_cases(participant, case_ids)}
+def assigned_mode(group: str, case_ids: tuple[str, ...], case_id: str) -> str:
+    """Режим кейса для группы; кейс вне списка — ошибка запроса."""
+    modes = {item["case_id"]: item["mode"] for item in assign_cases(group, case_ids)}
     if case_id not in modes:
         raise ValueError(f"Case {case_id} is not assigned")
     return modes[case_id]
@@ -312,7 +327,7 @@ def count_review_rows(raw: object) -> dict:
     return {key: counts[key] for key in ("accepted", "rejected", "edited", "added")}
 
 
-def build_record(payload: dict, case: dict, mode: str, config: TimingConfig) -> dict:
+def build_record(payload: dict, case: dict, group: str, mode: str, config: TimingConfig) -> dict:
     """Ответ страницы -> запись замера с активным временем и правильностью по gold."""
     started = parse_time(payload.get("started_at"), "started_at")
     finished = parse_time(payload.get("finished_at"), "finished_at")
@@ -324,6 +339,7 @@ def build_record(payload: dict, case: dict, mode: str, config: TimingConfig) -> 
     record = {
         "participant": require_text(payload.get("participant"), "participant"),
         "case_id": case["id"],
+        "group": group,
         "mode": mode,
         "dataset_version": case.get("dataset_version"),
         "started_at": started.isoformat(),
@@ -354,12 +370,39 @@ def load_records(paths: list[Path]) -> list[dict]:
     ]
 
 
+def participant_records(out_dir: Path, participant: str) -> list[dict]:
+    """Уже сданные замеры участника; файла нет -> пусто."""
+    path = record_path(out_dir, participant)
+    return load_records([path]) if path.exists() else []
+
+
+def record_group(record: dict) -> str:
+    """Группа записи; записи без поля group сделаны до выбора группы, когда режим решала четность хэша."""
+    return record.get("group", suggested_group(record["participant"]))
+
+
+def locked_group(records: list[dict], participant: str) -> str | None:
+    """Группа, в которой участник уже сдавал кейсы; ничего не сдал -> None."""
+    if not records:
+        return None
+    return record_group(records[0])
+
+
+def resolve_group(out_dir: Path, participant: str, requested: object) -> str:
+    """Выбранная группа, если она совпадает с закрепленной; иначе ValueError.
+
+    Без этой проверки участник мог бы сменить группу и пройти кейс во втором режиме.
+    """
+    group = require_group(requested)
+    locked = locked_group(participant_records(out_dir, participant), participant)
+    if locked is not None and locked != group:
+        raise ValueError(f"{participant} already submitted cases in group {locked}")
+    return group
+
+
 def done_case_ids(out_dir: Path, participant: str) -> set[str]:
     """Кейсы, которые участник уже сдал."""
-    path = record_path(out_dir, participant)
-    if not path.exists():
-        return set()
-    return {record["case_id"] for record in load_records([path])}
+    return {record["case_id"] for record in participant_records(out_dir, participant)}
 
 
 def append_record(out_dir: Path, record: dict) -> Path:
@@ -392,21 +435,30 @@ def summarize_mode(records: list[dict]) -> dict:
 
 
 def summarize_records(records: list[dict]) -> dict:
-    """Все замеры -> сводка по режимам, медианы по кейсам и отношение review/manual."""
+    """Все замеры -> сводка по режимам, группам, медианы по кейсам и отношение review/manual.
+
+    Отношение медиан считается только при балансе: обе группы есть и каждый кейс пройден
+    в обоих режимах. Иначе режим смешан с трудностью кейсов, ради чего и нужен контрбаланс.
+    """
     by_mode = {mode: [r for r in records if r["mode"] == mode] for mode in (MANUAL, REVIEW)}
     modes = {mode: summarize_mode(rows) for mode, rows in by_mode.items() if rows}
     cases = {}
     for record in records:
         cases.setdefault(record["case_id"], {}).setdefault(record["mode"], []).append(record["active_seconds"])
+    groups = {group: len({r["participant"] for r in records if record_group(r) == group}) for group in GROUPS}
+    one_mode = sorted(case_id for case_id, per_mode in cases.items() if set(per_mode) != {MANUAL, REVIEW})
     summary = {
         "records": len(records),
         "modes": modes,
+        "groups": groups,
+        "cases_in_one_mode": one_mode,
+        "balanced": all(groups.values()) and not one_mode,
         "cases": {
             case_id: {mode: statistics.median(times) for mode, times in sorted(per_mode.items())}
             for case_id, per_mode in sorted(cases.items())
         },
     }
-    if MANUAL in modes and REVIEW in modes:
+    if summary["balanced"]:
         summary["review_to_manual_median"] = round(
             modes[REVIEW]["median_active_seconds"] / modes[MANUAL]["median_active_seconds"], SECONDS_DIGITS
         )
@@ -427,8 +479,12 @@ def print_summary(summary: dict, path: Path) -> None:
             f"{mode:<8} {row['n']:>3} {row['participants']:>5} {row['median_active_seconds']:>11.1f} "
             f"{row['mean_active_seconds']:>11.1f} {format_rate(row['precision']):>9} {format_rate(row['recall']):>7}"
         )
-    if "review_to_manual_median" in summary:
+    print("Участников по группам: " + ", ".join(f"{group} {n}" for group, n in summary["groups"].items()))
+    if summary["balanced"]:
         print(f"Медиана review / медиана manual: {summary['review_to_manual_median']:.3f}")
+    else:
+        only = ", ".join(summary["cases_in_one_mode"]) or "нет"
+        print(f"Нет баланса групп, отношение медиан не считается; кейсы в одном режиме: {only}")
     print("Название задачи не сравнивается: у задачи проверяются закупка, ответственный и срок")
 
 
@@ -457,11 +513,17 @@ def case_view(case: dict, mode: str, prediction: dict | None) -> dict:
     return view
 
 
-def assignment_view(config: TimingConfig, participant: str) -> dict:
-    """Участник -> его кейсы с режимом и отметкой о сдаче."""
+def group_view(config: TimingConfig, participant: str) -> dict:
+    """Участник -> подсказка группы по хэшу и закрепленная группа, если он уже сдавал."""
+    records = participant_records(config.out_dir, participant)
+    return {"suggested": suggested_group(participant), "locked": locked_group(records, participant)}
+
+
+def assignment_view(config: TimingConfig, participant: str, group: str) -> dict:
+    """Участник и группа -> его кейсы с режимом и отметкой о сдаче."""
     done = done_case_ids(config.out_dir, participant)
-    cases = [dict(item, done=item["case_id"] in done) for item in assign_cases(participant, config.case_ids)]
-    return {"participant": participant, "cases": cases}
+    cases = [dict(item, done=item["case_id"] in done) for item in assign_cases(group, config.case_ids)]
+    return {"participant": participant, "group": group, "cases": cases}
 
 
 class TimingHandler(BaseHTTPRequestHandler):
@@ -474,14 +536,17 @@ class TimingHandler(BaseHTTPRequestHandler):
         try:
             if url.path == "/":
                 self.send_body(HTTPStatus.OK, PAGE_PATH.read_bytes(), "text/html; charset=utf-8")
+            elif url.path == "/api/group":
+                self.send_json(HTTPStatus.OK, group_view(config, require_text(query.get("participant"), "participant")))
             elif url.path == "/api/cases":
-                self.send_json(
-                    HTTPStatus.OK, assignment_view(config, require_text(query.get("participant"), "participant"))
-                )
+                participant = require_text(query.get("participant"), "participant")
+                group = resolve_group(config.out_dir, participant, query.get("group"))
+                self.send_json(HTTPStatus.OK, assignment_view(config, participant, group))
             elif url.path == "/api/case":
                 participant = require_text(query.get("participant"), "participant")
+                group = resolve_group(config.out_dir, participant, query.get("group"))
                 case_id = require_text(query.get("id"), "id")
-                mode = assigned_mode(participant, config.case_ids, case_id)
+                mode = assigned_mode(group, config.case_ids, case_id)
                 self.send_json(HTTPStatus.OK, case_view(config.cases[case_id], mode, config.predictions.get(case_id)))
             else:
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
@@ -497,11 +562,12 @@ class TimingHandler(BaseHTTPRequestHandler):
             payload = self.read_json()
             participant = require_text(payload.get("participant"), "participant")
             case_id = require_text(payload.get("case_id"), "case_id")
-            mode = assigned_mode(participant, config.case_ids, case_id)
+            group = resolve_group(config.out_dir, participant, payload.get("group"))
+            mode = assigned_mode(group, config.case_ids, case_id)
             if case_id in done_case_ids(config.out_dir, participant):
                 self.send_json(HTTPStatus.CONFLICT, {"error": f"{case_id} already submitted by {participant}"})
                 return
-            record = build_record(payload, config.cases[case_id], mode, config)
+            record = build_record(payload, config.cases[case_id], group, mode, config)
         except ValueError as exc:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return

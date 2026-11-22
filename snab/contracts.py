@@ -46,6 +46,7 @@ class StopReason(StrEnum):
     """Почему система закончила шаг."""
 
     DONE = "done"
+    CLARIFY = "clarify"
     BUDGET_EXHAUSTED = "budget_exhausted"
     TIMEOUT = "timeout"
     TOOL_ERROR = "tool_error"

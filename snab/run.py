@@ -1,8 +1,10 @@
 """Единый раннер eval: python -m snab.run --system rules --split dev --out runs/<name>.
 
 Состояние CRM создается заново для каждого кейса, эпизоды идут в порядке timeline,
-система видит только источники, поступившие к шагу. Действия пользователя выполняет
-код через CRM: подтверждается только предложение системы, сопоставленное с gold по фактам
+система видит только источники, поступившие к шагу. Событие помечается source_complete,
+если это последний кусок своего источника: так конвейер загрузки сообщает, что запись
+встречи закончилась и частичные кандидаты можно собрать в один дифф. Действия
+пользователя выполняет код через CRM: подтверждается только предложение системы, сопоставленное с gold по фактам
 кодом, без судьи. Операции gold не исполняются.
 """
 
@@ -137,6 +139,7 @@ class CaseReplay:
         self.tools = ModelTools(self.crm, self.faults, self.tracer, budget)
         self.wanted_points = {check["after"] for check in case["gold"]["checks"]}
         self.all_events = {event["id"]: event for _, step in SCORER.timeline(case) for event in step["events"]}
+        self.last_chunks = {event.get("source_id", event["id"]): event["id"] for event in self.all_events.values()}
         self.sources = {}
         self.proposals = {}
         self.blocked_proposals = {}
@@ -218,7 +221,10 @@ class CaseReplay:
         data = self.case["input"]
         return EpisodeContext(
             episode_id=episode_id,
-            events=events,
+            events=[
+                {**event, "source_complete": self.last_chunks[event.get("source_id", event["id"])] == event["id"]}
+                for event in events
+            ],
             seen_events=list(self.tools.sources),
             crm_state=self.crm.snapshot(),
             authority_registry=data.get("authority_registry", {}),
@@ -519,9 +525,14 @@ def requirement_versions() -> dict[str, str]:
     return {name: version(name) for name in names}
 
 
+def dataset_path(args: argparse.Namespace) -> Path:
+    """--cases или файл split -> путь к набору кейсов."""
+    return args.cases or DATASETS[args.split]
+
+
 def collect_meta(args: argparse.Namespace, system: System, cases: list[dict], started: str, finished: str) -> dict:
     """Все, что нужно для воспроизведения прогона, включая хэши кода при грязном дереве."""
-    dataset = DATASETS[args.split]
+    dataset = dataset_path(args)
     git_dirty = bool(git_output("status", "--porcelain").strip())
     return {
         "git_sha": git_output("rev-parse", "HEAD").strip(),
@@ -564,6 +575,8 @@ def summarize(records: list[dict], case_stats: list[dict], wall_time_s: float, c
     events = sum(stats["events"] for stats in case_stats)
     llm = [record for record in records if record["kind"] == "llm"]
     tokens = sum(record["tokens_in"] + record["tokens_out"] for record in llm)
+    # prompt_eval_count Ollama на вызов: полный контекст, по нему проверяется окно 8192
+    prompt_tokens = [record["tokens_in"] for record in llm]
     return {
         "wall_time_s": round(wall_time_s, 3),
         "cases": len(case_stats),
@@ -581,6 +594,11 @@ def summarize(records: list[dict], case_stats: list[dict], wall_time_s: float, c
         ),
         "tokens_in": sum(record["tokens_in"] for record in llm),
         "tokens_out": sum(record["tokens_out"] for record in llm),
+        "prompt_tokens_per_call": {
+            "p50": percentile(prompt_tokens, 0.5),
+            "p95": percentile(prompt_tokens, 0.95),
+            "max": max(prompt_tokens, default=None),
+        },
         "stop_reasons": dict(sum((Counter(stats["stop_reasons"]) for stats in case_stats), Counter())),
         "invalid_proposals": dict(sum((Counter(stats["invalid_proposals"]) for stats in case_stats), Counter())),
         "unsupported_fault_injections": unsupported_cases(case_stats),
@@ -628,8 +646,8 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 def gold_file(args: argparse.Namespace, cases: list[dict], out_dir: Path) -> Path:
-    """Эталон для оценщика: весь split или только выбранные кейсы."""
-    dataset = DATASETS[args.split]
+    """Эталон для оценщика: весь набор или только выбранные кейсы."""
+    dataset = dataset_path(args)
     if len(cases) == len(read_cases(dataset)):
         return dataset
     path = out_dir / "gold-selection.jsonl"
@@ -674,6 +692,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--system", choices=sorted(SYSTEMS), required=True)
     parser.add_argument("--split", choices=sorted(DATASETS), default="dev")
+    parser.add_argument("--cases", type=Path, help="свой набор кейсов вместо --split, например eval/dev_noisy.jsonl")
     parser.add_argument("--ids", help="file with one case id per line")
     parser.add_argument("--category")
     parser.add_argument("--limit", type=int)
@@ -681,7 +700,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--out", type=Path)
     parser.add_argument("--i-know-this-is-heldout", action="store_true", dest="heldout_confirmed")
     args = parser.parse_args(argv)
-    if args.split == "test" and not args.heldout_confirmed:
+    if args.cases is not None:
+        args.cases = args.cases.resolve()
+    heldout = args.split == "test" or args.cases == DATASETS["test"].resolve()
+    if heldout and not args.heldout_confirmed:
         parser.error("test is held out until KT-4; pass --i-know-this-is-heldout to run it")
     if args.repeat < 1 or (args.limit is not None and args.limit < 1):
         parser.error("--repeat and --limit must be positive")
@@ -693,10 +715,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     system = build_system(args.system)
     started_at = datetime.now(UTC)
-    run_id = f"{started_at:%Y%m%dT%H%M%SZ}_{args.system}_{args.split}"
+    run_id = f"{started_at:%Y%m%dT%H%M%SZ}_{args.system}_{args.cases.stem if args.cases else args.split}"
     out_dir = args.out or REPO_ROOT / "runs" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
-    cases = select_cases(read_cases(DATASETS[args.split]), args)
+    cases = select_cases(read_cases(dataset_path(args)), args)
     gold = gold_file(args, cases, out_dir)
     started, cpu_started = time.perf_counter(), time.process_time()
     all_records, all_stats, reports = [], [], []
