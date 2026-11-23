@@ -269,3 +269,18 @@ tmp/
 # Generated evaluation outputs; datasets and annotations stay versioned
 eval-report*.json
 eval/.score-selfcheck.json
+
+# Runner outputs: the reference run is versioned whole, other runs only by metadata and scores;
+# traces and predictions are too large and are rebuilt by make
+/runs/*
+!/runs/*/
+/runs/*/*
+!/runs/kt3-ref/*
+!/runs/*/meta.json
+!/runs/*/summary.json
+!/runs/*/eval-report*.json
+# Scratch runs are not referenced from the docs
+/runs/m1-rules-dev/
+/runs/timing/
+# A subset run copies the selected gold next to predictions; it must not be versioned
+/runs/kt3-ref/gold-selection.jsonl

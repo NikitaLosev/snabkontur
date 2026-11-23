@@ -1,0 +1,81 @@
+{
+  "git_sha": "fc4d19715bfe0cfb990a05906d8fb25107aada0e",
+  "git_dirty": true,
+  "git_diff_sha256": "80bc02740abe06357eae8f8a043907fb60a11825ec2bb3c117ee74dc143c2218",
+  "code_sha256": {
+    "snab/__init__.py": "477ccea129ed0155e869908e891a002e335b4f1fe8a44ff07243886cb30c7c5a",
+    "snab/contracts.py": "47b3321cfe4ec92b4865d86a11d89d5d97cc31992a44b158ab51f139ecb47f46",
+    "snab/crm.py": "47a5d2f2a4655ec40467e2feeb0d7e58f2a732cc0b85d30dc2086239579c3932",
+    "snab/merge.py": "91e6367f1a228289aef997e12a112f0e8424ae6e60c419249fc7447177320e8d",
+    "snab/report.py": "19fea733ccbd1d84de11a7009772893b992bbb6bfc78272a8520a3e1bf696e2d",
+    "snab/run.py": "d380a7d115886ce46593867152ffa4328d2d67f2c6ee2e7ee806617548c82943",
+    "snab/systems/__init__.py": "0e25ded47339f6da0013b9138c62e366a58f659246eb9ca3360e75964a6acbb0",
+    "snab/systems/llm.py": "64e224c2c92057ab8f613bb49fb3874831e93aeef2c13aaa50c6e1913c4fc93b",
+    "snab/systems/rules.py": "28ddbfee04abbf4eb279e15a2dc121f84c904ba903b49df541c8ddbbbe4b82b8",
+    "snab/timing.py": "a3cb9824c8ae6b4f20fd5e03b80c366350a90b06ebd2e2943aa94b4d8d35b6f9",
+    "snab/tools.py": "71959aa34a91f9e5be682695763aef3bf4d26625aa1b6bbec28ca831631d501b",
+    "snab/trace.py": "43c0b822a6c6bdb703c4966fc81c0464a7ce18897abfb75842e99c095d7a119a"
+  },
+  "scorer_sha256": "91117cf07f389c91fdb9b70032823e138a06f5b89cb8f6cfdd8646fbaee4ca41",
+  "dataset": "eval/dev_noisy.jsonl",
+  "dataset_sha256_lf": "2f411cfbfa55253d5d77aaa4fce77292fe9f26d7d567d6c85ca751402f220065",
+  "dataset_version": [
+    "2026-10-25.2-noisy.1"
+  ],
+  "selected_case_ids": [
+    "E01-N",
+    "E09-N",
+    "E10-N",
+    "E15-N",
+    "E21-N",
+    "D-EXT-01-N",
+    "D-EXT-03-N",
+    "D-DEC-01-N",
+    "D-ENT-01-N",
+    "D-ENT-03-N",
+    "D-TRU-01-N",
+    "D-TRU-03-N",
+    "D-WOR-01-N",
+    "D-WOR-02-N",
+    "D-WOR-14-N"
+  ],
+  "repeat": 1,
+  "system": "rules",
+  "model": null,
+  "temperature": null,
+  "seed": null,
+  "prompt_hashes": {},
+  "prompts": {},
+  "budgets": {
+    "max_tool_calls": 2,
+    "max_model_calls": 3,
+    "max_json_retries": 1,
+    "model_timeout_s": 90.0,
+    "tool_timeout_s": 2.0,
+    "episode_timeout_s": 180.0
+  },
+  "hardware": {
+    "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "hw.model": "MacBookPro18,3",
+    "machdep.cpu.brand_string": "Apple M1 Pro",
+    "hw.memsize": "17179869184",
+    "hw.ncpu": "8"
+  },
+  "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]",
+  "packages": {
+    "pydantic": "2.14.4",
+    "langchain-openai": "1.8.5"
+  },
+  "argv": [
+    "/Users/nikitalosev/Documents/snabkontur/snab/run.py",
+    "--system",
+    "rules",
+    "--cases",
+    "eval/dev_noisy.jsonl",
+    "--out",
+    "runs/noisy-rules"
+  ],
+  "started_at": "2026-11-22T16:22:20.296168+00:00",
+  "finished_at": "2026-11-22T16:22:20.513611+00:00"
+}

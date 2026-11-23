@@ -1,0 +1,53 @@
+{
+  "wall_time_s": 1980.274,
+  "cases": 90,
+  "episodes": 190,
+  "events": 212,
+  "episode_latency_ms": {
+    "p50": 8832.709,
+    "p95": 31745.689
+  },
+  "case_latency_ms": {
+    "p50": 12451.469,
+    "p95": 57725.175
+  },
+  "llm_calls": 343,
+  "tool_calls": 134,
+  "tool_errors": {
+    "ambiguous": 3,
+    "not_found": 25,
+    "timeout": 1
+  },
+  "crm_writes": 57,
+  "tokens_in": 585116,
+  "tokens_out": 44692,
+  "prompt_tokens_per_call": {
+    "p50": 1852,
+    "p95": 2164,
+    "max": 2329
+  },
+  "stop_reasons": {
+    "done": 231,
+    "clarify": 8,
+    "tool_error": 1
+  },
+  "invalid_proposals": {},
+  "unsupported_fault_injections": {
+    "D-WOR-17": [
+      {
+        "at": "D-WOR-17-step3",
+        "operation": "read_evidence",
+        "fault": "step_budget_exhausted",
+        "once": true
+      }
+    ]
+  },
+  "peak_rss_mb": 59.5,
+  "cost": {
+    "api_usd": 0.0,
+    "local_cpu_s": 1.436,
+    "llm_tokens": 629808,
+    "cpu_ms_per_event": 6.776,
+    "llm_tokens_per_event": 2970.8
+  }
+}

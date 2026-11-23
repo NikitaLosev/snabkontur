@@ -1,0 +1,62 @@
+{
+  "records": 18,
+  "modes": {
+    "manual": {
+      "n": 9,
+      "participants": 3,
+      "median_active_seconds": 35.791,
+      "mean_active_seconds": 44.333,
+      "tp": 13,
+      "fp": 13,
+      "fn": 2,
+      "precision": 0.5,
+      "recall": 0.8666666666666667,
+      "exact_share": 0.2222222222222222
+    },
+    "review": {
+      "n": 9,
+      "participants": 3,
+      "median_active_seconds": 20.375,
+      "mean_active_seconds": 29.586,
+      "tp": 15,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.9375,
+      "recall": 1.0,
+      "exact_share": 0.8888888888888888
+    }
+  },
+  "groups": {
+    "A": 2,
+    "B": 1
+  },
+  "cases_in_one_mode": [],
+  "balanced": true,
+  "cases": {
+    "D-DEC-01": {
+      "manual": 25.9875,
+      "review": 39.668
+    },
+    "D-EXT-07": {
+      "manual": 42.979,
+      "review": 14.928999999999998
+    },
+    "D-WOR-01": {
+      "manual": 71.2165,
+      "review": 61.647
+    },
+    "E10": {
+      "manual": 26.74,
+      "review": 18.742
+    },
+    "E12": {
+      "manual": 13.592,
+      "review": 14.891
+    },
+    "E14": {
+      "manual": 94.534,
+      "review": 43.288
+    }
+  },
+  "review_to_manual_median": 0.569
+}
